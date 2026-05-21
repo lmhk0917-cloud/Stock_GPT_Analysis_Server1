@@ -1,0 +1,5 @@
+# Kiwoom OpenAPI+ legacy worker only.
+# Keep this environment separate from the 64-bit server runtime.
+PyQt5
+pandas
+numpy

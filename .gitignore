@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+
+# Runtime data
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/*.sqlite-*
+*.log
+logs/
+
+# IDE / OS
+.idea/
+.vscode/
+.vs/
+Thumbs.db
+Desktop.ini
+
+# Generated media / captures
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp

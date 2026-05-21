@@ -1,0 +1,16 @@
+[project]
+name = "stock-gpt-analysis-server1"
+version = "0.1.0"
+description = "Private multiuser stock analysis server with OpenAI gateway and broker adapter boundary"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "openai",
+  "pandas",
+  "numpy",
+  "requests",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
