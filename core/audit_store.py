@@ -174,7 +174,16 @@ class AuditStore:
             "SELECT COALESCE(SUM(total_tokens), 0) FROM gpt_call_logs"
         ).fetchone()[0]
 
+        users = self.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        watchlists = self.conn.execute("SELECT COUNT(*) FROM user_watchlists").fetchone()[0]
+        analyses = self.conn.execute("SELECT COUNT(*) FROM analysis_results").fetchone()[0]
+        events = self.conn.execute("SELECT COUNT(*) FROM event_logs").fetchone()[0]
+
         return {
+            "users": users,
+            "watchlists": watchlists,
+            "analysis_results": analyses,
+            "events": events,
             "api_requests": request_count,
             "notifications": notification_count,
             "orders": order_count,

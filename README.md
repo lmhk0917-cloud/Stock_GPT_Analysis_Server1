@@ -35,10 +35,9 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 
 ```powershell
 cd C:\Users\lmhk2\PycharmProjects\Stock_GPT_Analysis_Server1
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python tools\runtime_check.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe create -y -n stock_server_py311 python=3.11
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python -m pip install -r requirements.txt
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\runtime_check.py
 ```
 
 Windows `py` launcher가 설치되어 있으면 `py -3.11 -m venv .venv`를 써도 된다.
@@ -46,7 +45,25 @@ Windows `py` launcher가 설치되어 있으면 `py -3.11 -m venv .venv`를 써�
 오프라인 안정화 체크:
 
 ```powershell
-python tools\stability_check.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\stability_check.py
+```
+
+운영 준비 상태 전체 점검:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
+```
+
+환경변수 점검:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\env_check.py
+```
+
+SQLite DB 백업:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\backup_db.py
 ```
 
 현재 환경에서 바로 실행 가능한 개발용 HTTP 서버:
@@ -58,7 +75,7 @@ python tools\stability_check.py
 개발용 서버 smoke test:
 
 ```powershell
-python tools\server_smoke_test.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\server_smoke_test.py
 ```
 
 FastAPI 정식 API 서버:
