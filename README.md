@@ -29,6 +29,21 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 
 증권사 API 키 저장에는 `CREDENTIAL_MASTER_KEY`가 필요하다. 이 값이 없으면 broker credential 저장 API는 실패한다. 실제 주문 실행은 `ENABLE_ORDER_API=0`이 기본값이라 차단된다. 나중에 주문 adapter를 붙이더라도 `REQUIRE_ORDER_CONFIRMATION=1`이면 `ORDER_CONFIRMATION_TEXT`와 동일한 승인 문구가 들어온 요청만 다음 단계로 넘어간다.
 
+## 로컬 API 키 설정
+
+OpenAI API 키를 직접 발급받은 뒤에는 `.env.local.example`을 `.env.local`로 복사하고 `OPENAI_API_KEY` 값을 채운다. `.env.local`은 `.gitignore`로 제외되어 GitHub에 올라가지 않는다.
+
+```powershell
+Copy-Item .env.local.example .env.local
+notepad .env.local
+```
+
+키 설정 후 실제 GPT 연결 테스트:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\openai_smoke_test.py
+```
+
 ## 실행
 
 권장 서버 환경:

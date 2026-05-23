@@ -15,6 +15,7 @@ env/
 .env
 .env.*
 !.env.example
+!.env.local.example
 *.key
 *.pem
 *.p12

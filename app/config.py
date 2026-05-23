@@ -5,6 +5,11 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+from app.env_loader import load_project_env
+
+load_project_env(PROJECT_ROOT)
+
 DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_DB_PATH = DATA_DIR / "stock_gpt_analysis_server1.db"
 
