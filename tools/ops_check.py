@@ -1,5 +1,6 @@
 """One-command operational readiness check."""
 
+import argparse
 import os
 import subprocess
 import sys
@@ -7,10 +8,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def run_step(name, args):
+def run_step(name, args, live_openai=False):
     print("== {} ==".format(name))
     env = os.environ.copy()
-    if args != ["tools/openai_smoke_test.py"]:
+    if not live_openai:
         env["OPENAI_API_KEY"] = ""
     result = subprocess.run(
         [sys.executable] + args,
@@ -26,13 +27,23 @@ def run_step(name, args):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--live-openai",
+        action="store_true",
+        help="include a real OpenAI API smoke test using OPENAI_API_KEY",
+    )
+    args = parser.parse_args()
+
     os.environ.setdefault("CREDENTIAL_MASTER_KEY", "local-ops-check-master-key")
     run_step("runtime", ["tools/runtime_check.py"])
-    run_step("env", ["tools/env_check.py"])
+    run_step("env", ["tools/env_check.py"], live_openai=args.live_openai)
     run_step("compile", ["-m", "compileall", "-q", "."])
     run_step("stability", ["tools/stability_check.py"])
     run_step("http", ["tools/server_smoke_test.py"])
     run_step("fastapi", ["tools/fastapi_smoke_test.py"])
+    if args.live_openai:
+        run_step("openai", ["tools/openai_smoke_test.py"], live_openai=True)
     print("OPS_CHECK_OK")
 
 

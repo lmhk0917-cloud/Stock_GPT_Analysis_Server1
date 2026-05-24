@@ -69,6 +69,12 @@ C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_serv
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
 ```
 
+실제 OpenAI 호출까지 포함한 운영 점검:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py --live-openai
+```
+
 FastAPI 인증 smoke test:
 
 ```powershell
