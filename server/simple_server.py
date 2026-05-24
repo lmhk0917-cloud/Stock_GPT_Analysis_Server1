@@ -17,6 +17,7 @@ from core.audit_store import AuditStore
 from core.database import init_db
 from core.memory_store import UserMemoryStore
 from core.request_audit_store import RequestAuditStore
+from core.session_store import SessionStore
 from core.user_store import UserStore
 from market_data.realtime_worker import run_once
 from server.chat_service import ChatService
@@ -33,6 +34,7 @@ class ServerState:
         self.audit = AuditStore(self.conn)
         self.memory = UserMemoryStore(self.conn)
         self.request_audit = RequestAuditStore(self.conn)
+        self.sessions = SessionStore(self.conn)
 
 
 def make_handler(state):
@@ -52,8 +54,10 @@ def make_handler(state):
                 if method == "GET" and path == "/health":
                     self._send(200, {"status": "ok", "server": "simple"})
                 elif method == "GET" and path == "/users":
+                    self._require_admin()
                     self._send(200, state.users.list_users())
                 elif method == "POST" and path == "/users":
+                    self._require_admin()
                     payload = self._read_json()
                     user_id = state.users.upsert_user(
                         payload["login_id"],
@@ -62,11 +66,26 @@ def make_handler(state):
                         telegram_chat_id=payload.get("telegram_chat_id"),
                     )
                     self._send(200, state.users.get_user(user_id))
+                elif method == "POST" and path == "/auth/login":
+                    payload = self._read_json()
+                    user = state.users.get_user_by_login(payload["login_id"])
+                    if not user:
+                        self._send(404, {"detail": "user not found"})
+                        return
+                    session = state.sessions.create_session(user["id"], label=payload.get("label", "simple"))
+                    self._send(200, {
+                        "user": user,
+                        "token": session["token"],
+                        "session_id": session["id"],
+                        "expires_at": session["expires_at"],
+                    })
                 elif method == "GET" and USER_MEMORY_RE.match(path):
                     user_id = int(USER_MEMORY_RE.match(path).group(1))
+                    self._require_user(user_id)
                     self._send(200, state.memory.list_memory(user_id))
                 elif method == "POST" and USER_CHAT_RE.match(path):
                     user_id = int(USER_CHAT_RE.match(path).group(1))
+                    self._require_user(user_id)
                     payload = self._read_json()
                     result = ChatService(state.conn).ask(
                         user_id,
@@ -120,6 +139,16 @@ def make_handler(state):
         def _require_admin(self):
             if ADMIN_API_TOKEN and self.headers.get("X-Admin-Token") != ADMIN_API_TOKEN:
                 raise PermissionError("invalid admin token")
+
+        def _require_user(self, user_id):
+            if ADMIN_API_TOKEN and self.headers.get("X-Admin-Token") == ADMIN_API_TOKEN:
+                return
+            token = self.headers.get("X-User-Token")
+            user = state.sessions.get_user_for_token(token)
+            if not user:
+                raise PermissionError("invalid user token")
+            if int(user["id"]) != int(user_id):
+                raise PermissionError("token does not match user")
 
         def _send(self, status, payload):
             raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")

@@ -9,9 +9,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def run_step(name, args):
     print("== {} ==".format(name))
+    env = os.environ.copy()
+    if args != ["tools/openai_smoke_test.py"]:
+        env["OPENAI_API_KEY"] = ""
     result = subprocess.run(
         [sys.executable] + args,
         cwd=ROOT,
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -28,6 +32,7 @@ def main():
     run_step("compile", ["-m", "compileall", "-q", "."])
     run_step("stability", ["tools/stability_check.py"])
     run_step("http", ["tools/server_smoke_test.py"])
+    run_step("fastapi", ["tools/fastapi_smoke_test.py"])
     print("OPS_CHECK_OK")
 
 

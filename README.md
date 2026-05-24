@@ -69,6 +69,12 @@ C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_serv
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
 ```
 
+FastAPI 인증 smoke test:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\fastapi_smoke_test.py
+```
+
 환경변수 점검:
 
 ```powershell

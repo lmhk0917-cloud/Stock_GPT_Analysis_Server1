@@ -13,7 +13,9 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 os.environ.setdefault("CREDENTIAL_MASTER_KEY", "local-server-smoke-test-master-key")
+os.environ["OPENAI_API_KEY"] = ""
 
+from app.config import ADMIN_API_TOKEN
 from server.simple_server import ServerState, make_handler
 from http.server import HTTPServer
 
@@ -24,6 +26,17 @@ def request(method, url, payload=None):
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def request_with_headers(method, url, payload=None, headers=None):
+    data = None
+    req_headers = {"Content-Type": "application/json"}
+    req_headers.update(headers or {})
+    if payload is not None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -40,10 +53,22 @@ def main():
     time.sleep(0.1)
 
     base = "http://127.0.0.1:{}".format(port)
+    admin_headers = {"X-Admin-Token": ADMIN_API_TOKEN} if ADMIN_API_TOKEN else {}
     health = request("GET", base + "/health")
-    user = request("POST", base + "/users", {"login_id": "smoke", "display_name": "Smoke User"})
-    chat = request("POST", base + "/users/{}/chat".format(user["id"]), {"content": "서버 상태 확인"})
-    overview = request("GET", base + "/admin/overview")
+    user = request_with_headers(
+        "POST",
+        base + "/users",
+        {"login_id": "smoke", "display_name": "Smoke User"},
+        admin_headers,
+    )
+    login = request("POST", base + "/auth/login", {"login_id": "smoke", "label": "smoke"})
+    chat = request_with_headers(
+        "POST",
+        base + "/users/{}/chat".format(user["id"]),
+        {"content": "서버 상태 확인"},
+        {"X-User-Token": login["token"]},
+    )
+    overview = request_with_headers("GET", base + "/admin/overview", headers=admin_headers)
 
     httpd.shutdown()
     thread.join(timeout=5)
@@ -51,6 +76,7 @@ def main():
     checks = {
         "health": health["status"] == "ok",
         "user": user["login_id"] == "smoke",
+        "login": bool(login["token"]),
         "chat": bool(chat["answer"]),
         "overview": overview["status"] == "ok",
     }

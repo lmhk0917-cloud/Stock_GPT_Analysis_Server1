@@ -9,12 +9,14 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 os.environ.setdefault("CREDENTIAL_MASTER_KEY", "local-stability-check-master-key")
+os.environ["OPENAI_API_KEY"] = ""
 
 from broker.order_service import OrderService
 from core.credential_store import BrokerCredentialStore
 from core.database import init_db
 from core.memory_store import UserMemoryStore
 from core.request_audit_store import RequestAuditStore
+from core.session_store import SessionStore
 from core.user_store import UserStore
 from server.chat_service import ChatService
 from server.services import bootstrap_demo_data
@@ -28,6 +30,8 @@ def main():
     conn = init_db(db_path)
     users = bootstrap_demo_data(conn)
     alice_id = users.get_user_by_login("alice")["id"]
+    session = SessionStore(conn).create_session(alice_id, label="stability")
+    session_user = SessionStore(conn).get_user_for_token(session["token"])
     credentials = BrokerCredentialStore(conn)
     credentials.upsert_credentials(
         alice_id,
@@ -69,9 +73,11 @@ def main():
     chat_count = conn.execute("SELECT COUNT(*) FROM chat_messages").fetchone()[0]
     request_log_count = conn.execute("SELECT COUNT(*) FROM api_request_logs").fetchone()[0]
     gpt_log_count = conn.execute("SELECT COUNT(*) FROM gpt_call_logs").fetchone()[0]
+    session_count = conn.execute("SELECT COUNT(*) FROM user_sessions").fetchone()[0]
 
     checks = {
         "users": user_count >= 2,
+        "user_sessions": session_count == 1 and session_user["id"] == alice_id,
         "watchlists": watch_count >= 3,
         "broker_credentials": credential_count == 1 and decrypted["app_secret"] == "demo-app-secret",
         "order_disabled_gate": order_count == 1 and order["status"] == "blocked_order_api_disabled",

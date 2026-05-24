@@ -3,7 +3,7 @@
 import time
 
 from broker.order_service import OrderService
-from server.auth import require_admin_token
+from server.auth import require_admin_token, require_user_token
 from server.chat_service import ChatService
 from core.database import init_db
 from core.user_store import UserStore
@@ -11,6 +11,7 @@ from core.audit_store import AuditStore
 from core.credential_store import BrokerCredentialStore
 from core.memory_store import UserMemoryStore
 from core.request_audit_store import RequestAuditStore
+from core.session_store import SessionStore
 from market_data.realtime_worker import run_once
 
 
@@ -19,6 +20,7 @@ users = UserStore(conn)
 audit = AuditStore(conn)
 memory = UserMemoryStore(conn)
 request_audit = RequestAuditStore(conn)
+sessions = SessionStore(conn)
 
 try:
     from fastapi import FastAPI, Header, HTTPException
@@ -32,6 +34,9 @@ except Exception:
 
 if BaseModel is object:
     class UserCreate(object):
+        pass
+
+    class LoginCreate(object):
         pass
 
     class WatchCreate(object):
@@ -63,6 +68,10 @@ else:
         display_name: str
         role: str = "user"
         telegram_chat_id: str = None
+
+    class LoginCreate(BaseModel):
+        login_id: str
+        label: str = "default"
 
     class WatchCreate(BaseModel):
         market: str = "KRX"
@@ -139,12 +148,27 @@ def create_api():
     def health():
         return {"status": "ok"}
 
+    @app.post("/auth/login")
+    def login(payload: LoginCreate):
+        user = users.get_user_by_login(payload.login_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="user not found")
+        session = sessions.create_session(user["id"], label=payload.label)
+        return {
+            "user": user,
+            "token": session["token"],
+            "session_id": session["id"],
+            "expires_at": session["expires_at"],
+        }
+
     @app.get("/users")
-    def list_users():
+    def list_users(x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
         return users.list_users()
 
     @app.post("/users")
-    def create_user(payload: UserCreate):
+    def create_user(payload: UserCreate, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
         user_id = users.upsert_user(
             payload.login_id,
             payload.display_name,
@@ -154,62 +178,77 @@ def create_api():
         return users.get_user(user_id)
 
     @app.get("/users/{user_id}/watchlist")
-    def list_watchlist(user_id: int):
-        _require_user(user_id)
+    def list_watchlist(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return users.list_watchlist(user_id)
 
     @app.post("/users/{user_id}/watchlist")
-    def add_watchlist(user_id: int, payload: WatchCreate):
-        _require_user(user_id)
+    def add_watchlist(user_id: int, payload: WatchCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         users.add_watchlist(user_id, payload.code, payload.name, payload.market, payload.enabled, payload.sort_order)
         return users.list_watchlist(user_id)
 
     @app.delete("/users/{user_id}/watchlist/{watch_id}")
-    def remove_watchlist(user_id: int, watch_id: int):
-        _require_user(user_id)
+    def remove_watchlist(user_id: int, watch_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         users.remove_watchlist(user_id, watch_id)
         return {"deleted": True}
 
     @app.get("/users/{user_id}/settings")
-    def get_settings(user_id: int):
-        _require_user(user_id)
+    def get_settings(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return users.get_settings(user_id)
 
     @app.put("/users/{user_id}/settings/{key}")
-    def set_setting(user_id: int, key: str, payload: SettingPut):
-        _require_user(user_id)
+    def set_setting(user_id: int, key: str, payload: SettingPut, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         users.set_setting(user_id, key, payload.value)
         return users.get_settings(user_id)
 
     @app.get("/users/{user_id}/memory")
-    def list_memory(user_id: int):
-        _require_user(user_id)
+    def list_memory(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return memory.list_memory(user_id)
 
     @app.post("/users/{user_id}/memory")
-    def add_memory(user_id: int, payload: MemoryCreate):
-        _require_user(user_id)
+    def add_memory(user_id: int, payload: MemoryCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         memory.add_memory(user_id, payload.content, payload.memory_type, payload.visibility)
         return memory.list_memory(user_id)
 
     @app.post("/users/{user_id}/chat-sessions")
-    def create_chat_session(user_id: int, payload: ChatSessionCreate):
-        _require_user(user_id)
+    def create_chat_session(user_id: int, payload: ChatSessionCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         session_id = memory.create_chat_session(user_id, payload.title)
         return {"id": session_id, "user_id": user_id, "title": payload.title}
 
+    @app.get("/users/{user_id}/sessions")
+    def list_user_sessions(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
+        return sessions.list_sessions(user_id)
+
+    @app.delete("/users/{user_id}/sessions/{session_id}")
+    def revoke_user_session(user_id: int, session_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
+        sessions.revoke_session(user_id, session_id)
+        return {"revoked": True}
+
     @app.get("/chat-sessions/{session_id}/messages")
-    def list_chat_messages(session_id: int):
+    def list_chat_messages(session_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        user_id = _chat_session_user_id(session_id)
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return memory.list_chat_messages(session_id)
 
     @app.post("/chat-sessions/{session_id}/messages")
-    def add_chat_message(session_id: int, payload: ChatMessageCreate):
+    def add_chat_message(session_id: int, payload: ChatMessageCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        user_id = _chat_session_user_id(session_id)
+        _require_user_access(user_id, x_user_token, x_admin_token)
         message_id = memory.add_chat_message(session_id, payload.role, payload.content, payload.token_count)
         return {"id": message_id}
 
     @app.post("/users/{user_id}/chat")
-    def ask_chat(user_id: int, payload: ChatAskCreate):
-        _require_user(user_id)
+    def ask_chat(user_id: int, payload: ChatAskCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return ChatService(conn).ask(
             user_id,
             payload.content,
@@ -218,14 +257,14 @@ def create_api():
         )
 
     @app.get("/users/{user_id}/broker-credentials")
-    def list_broker_credentials(user_id: int):
-        _require_user(user_id)
+    def list_broker_credentials(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         store = _credential_store()
         return store.list_credentials_meta(user_id)
 
     @app.put("/users/{user_id}/broker-credentials")
-    def put_broker_credentials(user_id: int, payload: BrokerCredentialPut):
-        _require_user(user_id)
+    def put_broker_credentials(user_id: int, payload: BrokerCredentialPut, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         store = _credential_store()
         store.upsert_credentials(
             user_id,
@@ -240,13 +279,13 @@ def create_api():
         return store.list_credentials_meta(user_id)
 
     @app.get("/users/{user_id}/orders")
-    def list_orders(user_id: int):
-        _require_user(user_id)
+    def list_orders(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return OrderService(conn).list_orders(user_id)
 
     @app.post("/users/{user_id}/orders")
-    def request_order(user_id: int, payload: OrderRequestCreate):
-        _require_user(user_id)
+    def request_order(user_id: int, payload: OrderRequestCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return OrderService(conn).request_order(
             user_id,
             payload.provider,
@@ -260,8 +299,8 @@ def create_api():
         )
 
     @app.get("/users/{user_id}/reports")
-    def list_reports(user_id: int):
-        _require_user(user_id)
+    def list_reports(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
         return audit.reports_for_user(user_id)
 
     @app.get("/symbols/{market}/{code}/chart")
@@ -322,6 +361,18 @@ def _require_user(user_id):
     if not user:
         raise HTTPException(status_code=404, detail="user not found")
     return user
+
+
+def _require_user_access(user_id, user_token, admin_token):
+    _require_user(user_id)
+    return require_user_token(sessions, user_id, user_token, admin_token, HTTPException)
+
+
+def _chat_session_user_id(session_id):
+    row = conn.execute("SELECT user_id FROM chat_sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="chat session not found")
+    return row["user_id"]
 
 
 def _credential_store():

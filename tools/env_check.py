@@ -20,9 +20,7 @@ from app.config import (
 def mask(value):
     if not value:
         return "MISSING"
-    if len(value) <= 8:
-        return "SET"
-    return "{}...{}".format(value[:4], value[-4:])
+    return "SET"
 
 
 def main():
