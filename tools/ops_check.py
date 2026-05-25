@@ -43,6 +43,7 @@ def main():
     run_step("stability", ["tools/stability_check.py"])
     run_step("http", ["tools/server_smoke_test.py"])
     run_step("fastapi", ["tools/fastapi_smoke_test.py"])
+    run_step("admin-ui", ["tools/admin_ui_smoke_test.py"])
     if args.live_openai:
         run_step("openai", ["tools/openai_smoke_test.py"], live_openai=True)
     print("OPS_CHECK_OK")

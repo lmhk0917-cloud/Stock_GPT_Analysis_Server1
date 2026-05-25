@@ -20,6 +20,7 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 - 사용자별 메모리와 채팅 세션/메시지 저장
 - 관리자 요청 로그 저장
 - 사용자 메모리와 최신 분석 결과를 포함하는 GPT 채팅 gateway
+- 브라우저에서 확인 가능한 관리자 대시보드
 - FastAPI 미설치 환경에서도 확인 가능한 표준 라이브러리 개발용 HTTP 서버
 - FastAPI 확장용 API 파일 제공
 
@@ -81,6 +82,12 @@ FastAPI 인증 smoke test:
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\fastapi_smoke_test.py
 ```
 
+관리자 대시보드 smoke test:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\admin_ui_smoke_test.py
+```
+
 환경변수 점검:
 
 ```powershell
@@ -116,6 +123,14 @@ FastAPI 정식 API 서버:
 ```powershell
 .\scripts\run_fastapi_server.ps1
 ```
+
+관리자 화면:
+
+```text
+http://127.0.0.1:8000/admin/ui
+```
+
+화면에서 `.env.local`의 `ADMIN_API_TOKEN`을 입력하면 사용자 목록, 요청 로그, GPT 호출 로그, 주문 요청, 사용자별 상세 정보를 조회할 수 있다. 토큰은 브라우저 `sessionStorage`에만 저장된다.
 
 키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
 

@@ -1,6 +1,7 @@
 """FastAPI endpoints for the private multiuser analysis MVP."""
 
 import time
+from pathlib import Path
 
 from broker.order_service import OrderService
 from server.auth import require_admin_token, require_user_token
@@ -24,11 +25,13 @@ sessions = SessionStore(conn)
 
 try:
     from fastapi import FastAPI, Header, HTTPException
+    from fastapi.responses import HTMLResponse
     from pydantic import BaseModel
 except Exception:
     FastAPI = None
     Header = None
     HTTPException = Exception
+    HTMLResponse = None
     BaseModel = object
 
 
@@ -147,6 +150,11 @@ def create_api():
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    @app.get("/admin/ui", response_class=HTMLResponse)
+    def admin_ui():
+        path = Path(__file__).resolve().parent / "static" / "admin.html"
+        return HTMLResponse(path.read_text(encoding="utf-8"))
 
     @app.post("/auth/login")
     def login(payload: LoginCreate):
@@ -353,7 +361,74 @@ def create_api():
         _require_admin(x_admin_token)
         return request_audit.list_logs(limit=limit, user_id=user_id)
 
+    @app.get("/admin/gpt-logs")
+    def admin_gpt_logs(limit: int = 100, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        return _query_rows(
+            """
+            SELECT id, started_at, finished_at, status, requested_count, symbols_json, model,
+                   prompt_tokens, completion_tokens, total_tokens, result_preview
+            FROM gpt_call_logs
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+    @app.get("/admin/orders")
+    def admin_orders(limit: int = 100, user_id: int = None, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        if user_id is None:
+            return _query_rows(
+                """
+                SELECT id, user_id, provider, market, code, side, quantity, order_type,
+                       limit_price, status, approval_required, created_at, updated_at
+                FROM order_requests
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        return _query_rows(
+            """
+            SELECT id, user_id, provider, market, code, side, quantity, order_type,
+                   limit_price, status, approval_required, created_at, updated_at
+            FROM order_requests
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        )
+
+    @app.get("/admin/users/{user_id}/details")
+    def admin_user_details(user_id: int, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        user = _require_user(user_id)
+        return {
+            "user": user,
+            "usage": audit.usage_summary(user_id),
+            "watchlist": users.list_watchlist(user_id),
+            "settings": users.get_settings(user_id),
+            "memory": memory.list_memory(user_id),
+            "sessions": sessions.list_sessions(user_id),
+            "broker_credentials": _safe_credential_meta(user_id),
+            "orders": OrderService(conn).list_orders(user_id),
+            "reports": audit.reports_for_user(user_id),
+        }
+
     return app
+
+
+def _query_rows(sql, params=()):
+    return [dict(row) for row in conn.execute(sql, params).fetchall()]
+
+
+def _safe_credential_meta(user_id):
+    try:
+        return _credential_store().list_credentials_meta(user_id)
+    except HTTPException as exc:
+        return {"error": exc.detail}
 
 
 def _require_user(user_id):

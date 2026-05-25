@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock GPT Admin</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d7dce2;
+      --text: #171b20;
+      --muted: #65707c;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --danger: #b42318;
+      --warn: #9a6700;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 650;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px 24px 28px;
+    }
+
+    aside,
+    section {
+      min-width: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    button {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font: inherit;
+    }
+
+    input,
+    select {
+      width: 100%;
+      background: #fff;
+      color: var(--text);
+    }
+
+    button {
+      cursor: pointer;
+      background: #fff;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .kpi .label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .kpi .value {
+      margin-top: 5px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0 12px;
+    }
+
+    .tabs button {
+      min-height: 32px;
+      padding-inline: 12px;
+    }
+
+    .tabs button.active {
+      border-color: var(--accent);
+      color: var(--accent-strong);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      background: #fbfcfd;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .wrap {
+      max-width: 420px;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #e7f5f3;
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .badge.warn {
+      background: #fff3cd;
+      color: var(--warn);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+    }
+
+    @media (max-width: 840px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main,
+      .split {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Stock_GPT_Analysis_Server1 Admin</h1>
+      <div class="status" id="lastUpdated">대기 중</div>
+    </div>
+    <button class="primary" id="refreshAll">전체 새로고침</button>
+  </header>
+
+  <main>
+    <aside class="stack">
+      <div class="panel stack">
+        <h2>접속</h2>
+        <label>
+          Admin token
+          <input id="adminToken" type="password" autocomplete="off" placeholder="X-Admin-Token">
+        </label>
+        <div class="button-row">
+          <button id="saveToken">적용</button>
+          <button id="clearToken">초기화</button>
+        </div>
+        <div class="status" id="authStatus">토큰은 이 브라우저 세션에만 저장됩니다.</div>
+      </div>
+
+      <div class="panel stack">
+        <h2>작업</h2>
+        <button id="runAnalysis">분석 실행</button>
+        <button id="runBackfill">백필 실행</button>
+        <div class="status" id="actionStatus"></div>
+      </div>
+
+      <div class="panel stack">
+        <h2>필터</h2>
+        <label>
+          User ID
+          <input id="userIdFilter" type="number" min="1" placeholder="선택 사항">
+        </label>
+        <label>
+          Limit
+          <select id="limitFilter">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+          </select>
+        </label>
+      </div>
+    </aside>
+
+    <section class="stack">
+      <div class="panel">
+        <h2>요약</h2>
+        <div class="kpis" id="kpis"></div>
+      </div>
+
+      <div class="panel">
+        <h2>관리 데이터</h2>
+        <div class="tabs">
+          <button class="active" data-view="users">사용자</button>
+          <button data-view="requests">요청 로그</button>
+          <button data-view="gpt">GPT 호출</button>
+          <button data-view="orders">주문 요청</button>
+          <button data-view="userDetails">사용자 상세</button>
+        </div>
+        <div id="content"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      token: sessionStorage.getItem("adminToken") || "",
+      view: "users",
+      overview: null,
+      users: [],
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    $("adminToken").value = state.token;
+
+    function headers() {
+      const result = {"Content-Type": "application/json"};
+      if (state.token) result["X-Admin-Token"] = state.token;
+      return result;
+    }
+
+    function status(id, text, isError = false) {
+      const el = $(id);
+      el.textContent = text;
+      el.classList.toggle("error", isError);
+    }
+
+    function qs(params) {
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) query.set(key, value);
+      });
+      return query.toString();
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {...headers(), ...(options.headers || {})},
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw new Error(data && data.detail ? data.detail : `${response.status} ${response.statusText}`);
+      }
+      return data;
+    }
+
+    function renderKpis(overview) {
+      const counts = overview && overview.counts ? overview.counts : {};
+      const usage = overview && overview.usage ? overview.usage : {};
+      const items = [
+        ["users", counts.users],
+        ["watchlists", counts.user_watchlists],
+        ["api requests", usage.api_requests],
+        ["gpt tokens", usage.gpt_total_tokens_all_users],
+        ["orders", counts.order_requests],
+        ["credentials", counts.broker_credentials],
+      ];
+      $("kpis").innerHTML = items.map(([label, value]) => `
+        <div class="kpi">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${value ?? 0}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderTable(rows, columns) {
+      if (!rows || rows.length === 0) {
+        $("content").innerHTML = `<div class="status">표시할 데이터가 없습니다.</div>`;
+        return;
+      }
+      const head = columns.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
+      const body = rows.map((row) => `
+        <tr>${columns.map((col) => `<td class="${col.wrap ? "wrap" : ""}">${cell(row, col)}</td>`).join("")}</tr>
+      `).join("");
+      $("content").innerHTML = `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function cell(row, col) {
+      const value = row[col.key];
+      if (col.badge) {
+        const cls = String(value || "").startsWith("blocked") ? "badge warn" : "badge";
+        return `<span class="${cls}">${escapeHtml(value ?? "")}</span>`;
+      }
+      if (typeof value === "object" && value !== null) return escapeHtml(JSON.stringify(value));
+      return escapeHtml(value ?? "");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function refreshOverview() {
+      state.overview = await api("/admin/overview");
+      renderKpis(state.overview);
+      status("lastUpdated", `마지막 갱신: ${new Date().toLocaleString()}`);
+    }
+
+    async function refreshUsers() {
+      state.users = await api("/users");
+      renderTable(state.users, [
+        {key: "id", label: "ID"},
+        {key: "login_id", label: "Login"},
+        {key: "display_name", label: "Name"},
+        {key: "role", label: "Role"},
+        {key: "is_active", label: "Active"},
+        {key: "created_at", label: "Created"},
+        {key: "updated_at", label: "Updated"},
+      ]);
+    }
+
+    async function refreshRequests() {
+      const params = qs({limit: $("limitFilter").value, user_id: $("userIdFilter").value});
+      const rows = await api(`/admin/request-logs?${params}`);
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "user_id", label: "User"},
+        {key: "method", label: "Method"},
+        {key: "path", label: "Path", wrap: true},
+        {key: "status_code", label: "Status"},
+        {key: "duration_ms", label: "ms"},
+        {key: "created_at", label: "Created"},
+      ]);
+    }
+
+    async function refreshGpt() {
+      const rows = await api(`/admin/gpt-logs?${qs({limit: $("limitFilter").value})}`);
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "status", label: "Status", badge: true},
+        {key: "model", label: "Model"},
+        {key: "requested_count", label: "Requests"},
+        {key: "total_tokens", label: "Tokens"},
+        {key: "started_at", label: "Started"},
+        {key: "finished_at", label: "Finished"},
+        {key: "result_preview", label: "Preview", wrap: true},
+      ]);
+    }
+
+    async function refreshOrders() {
+      const params = qs({limit: $("limitFilter").value, user_id: $("userIdFilter").value});
+      const rows = await api(`/admin/orders?${params}`);
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "user_id", label: "User"},
+        {key: "provider", label: "Provider"},
+        {key: "code", label: "Code"},
+        {key: "side", label: "Side"},
+        {key: "quantity", label: "Qty"},
+        {key: "order_type", label: "Type"},
+        {key: "status", label: "Status", badge: true},
+        {key: "approval_required", label: "Approval"},
+        {key: "created_at", label: "Created"},
+      ]);
+    }
+
+    async function refreshUserDetails() {
+      const userId = $("userIdFilter").value || (state.users[0] && state.users[0].id);
+      if (!userId) {
+        $("content").innerHTML = `<div class="status">User ID를 입력하거나 사용자를 먼저 생성하세요.</div>`;
+        return;
+      }
+      const data = await api(`/admin/users/${userId}/details`);
+      $("content").innerHTML = `
+        <div class="split">
+          <div class="table-wrap"><table><tbody>
+            <tr><th>User</th><td class="wrap">${escapeHtml(JSON.stringify(data.user, null, 2))}</td></tr>
+            <tr><th>Usage</th><td class="wrap">${escapeHtml(JSON.stringify(data.usage, null, 2))}</td></tr>
+            <tr><th>Credentials</th><td class="wrap">${escapeHtml(JSON.stringify(data.broker_credentials, null, 2))}</td></tr>
+          </tbody></table></div>
+          <div class="table-wrap"><pre>${escapeHtml(JSON.stringify({
+            watchlist: data.watchlist,
+            settings: data.settings,
+            memory: data.memory,
+            sessions: data.sessions,
+            orders: data.orders,
+            reports: data.reports,
+          }, null, 2))}</pre></div>
+        </div>`;
+    }
+
+    async function refreshView() {
+      const map = {
+        users: refreshUsers,
+        requests: refreshRequests,
+        gpt: refreshGpt,
+        orders: refreshOrders,
+        userDetails: refreshUserDetails,
+      };
+      await map[state.view]();
+    }
+
+    async function refreshAll() {
+      try {
+        status("authStatus", "조회 중...");
+        await refreshOverview();
+        await refreshView();
+        status("authStatus", "연결됨");
+      } catch (error) {
+        status("authStatus", error.message, true);
+      }
+    }
+
+    async function runAction(path, label) {
+      try {
+        status("actionStatus", `${label} 실행 중...`);
+        await api(path, {method: "POST"});
+        status("actionStatus", `${label} 완료`);
+        await refreshAll();
+      } catch (error) {
+        status("actionStatus", error.message, true);
+      }
+    }
+
+    document.querySelectorAll(".tabs button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        document.querySelectorAll(".tabs button").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        state.view = button.dataset.view;
+        await refreshView().catch((error) => status("authStatus", error.message, true));
+      });
+    });
+
+    $("saveToken").addEventListener("click", () => {
+      state.token = $("adminToken").value.trim();
+      sessionStorage.setItem("adminToken", state.token);
+      refreshAll();
+    });
+
+    $("clearToken").addEventListener("click", () => {
+      state.token = "";
+      $("adminToken").value = "";
+      sessionStorage.removeItem("adminToken");
+      status("authStatus", "토큰을 지웠습니다.");
+    });
+
+    $("refreshAll").addEventListener("click", refreshAll);
+    $("limitFilter").addEventListener("change", refreshView);
+    $("userIdFilter").addEventListener("change", refreshView);
+    $("runAnalysis").addEventListener("click", () => runAction("/admin/run-analysis", "분석"));
+    $("runBackfill").addEventListener("click", () => runAction("/admin/run-backfill", "백필"));
+
+    refreshAll();
+  </script>
+</body>
+</html>
