@@ -331,6 +331,23 @@
       </div>
 
       <div class="panel stack">
+        <h2>사용자 제어</h2>
+        <div class="button-row">
+          <button id="activateUser">활성화</button>
+          <button id="deactivateUser">비활성화</button>
+        </div>
+        <div class="button-row">
+          <button id="revokeSelectedSession">선택 세션 폐기</button>
+          <button id="revokeAllSessions">전체 세션 폐기</button>
+        </div>
+        <label>
+          Session ID
+          <input id="sessionIdFilter" type="number" min="1" placeholder="선택 세션 폐기용">
+        </label>
+        <div class="status" id="userControlStatus"></div>
+      </div>
+
+      <div class="panel stack">
         <h2>필터</h2>
         <label>
           User ID
@@ -527,10 +544,67 @@
           token: session.token,
           expires_at: session.expires_at,
         }, null, 2);
+        $("sessionIdFilter").value = session.session_id;
         status("tokenIssueStatus", "발급 완료. 이 토큰은 다시 조회할 수 없습니다.");
         await refreshAll();
       } catch (error) {
         status("tokenIssueStatus", error.message, true);
+      }
+    }
+
+    function selectedUserId() {
+      return $("userIdFilter").value || (state.users[0] && state.users[0].id);
+    }
+
+    async function setUserActive(isActive) {
+      const userId = selectedUserId();
+      if (!userId) {
+        status("userControlStatus", "User ID를 입력하거나 사용자를 먼저 생성하세요.", true);
+        return;
+      }
+      try {
+        status("userControlStatus", "처리 중...");
+        await api(`/admin/users/${userId}/status`, {
+          method: "PUT",
+          body: JSON.stringify({is_active: isActive}),
+        });
+        status("userControlStatus", isActive ? "사용자를 활성화했습니다." : "사용자를 비활성화하고 세션을 폐기했습니다.");
+        await refreshAll();
+      } catch (error) {
+        status("userControlStatus", error.message, true);
+      }
+    }
+
+    async function revokeSelectedSession() {
+      const userId = selectedUserId();
+      const sessionId = $("sessionIdFilter").value;
+      if (!userId || !sessionId) {
+        status("userControlStatus", "User ID와 Session ID가 필요합니다.", true);
+        return;
+      }
+      try {
+        status("userControlStatus", "세션 폐기 중...");
+        await api(`/admin/users/${userId}/sessions/${sessionId}`, {method: "DELETE"});
+        status("userControlStatus", `세션 ${sessionId} 폐기 완료`);
+        await refreshAll();
+      } catch (error) {
+        status("userControlStatus", error.message, true);
+      }
+    }
+
+    async function revokeAllSessions() {
+      const userId = selectedUserId();
+      if (!userId) {
+        status("userControlStatus", "User ID를 입력하거나 사용자를 먼저 생성하세요.", true);
+        return;
+      }
+      try {
+        status("userControlStatus", "전체 세션 폐기 중...");
+        await api(`/admin/users/${userId}/sessions/revoke-all`, {method: "POST"});
+        status("userControlStatus", "전체 세션 폐기 완료");
+        await refreshAll();
+      } catch (error) {
+        status("userControlStatus", error.message, true);
       }
     }
 
@@ -666,6 +740,10 @@
     $("runBackfill").addEventListener("click", () => runAction("/admin/run-backfill", "백필"));
     $("createUser").addEventListener("click", createUser);
     $("issueUserToken").addEventListener("click", issueUserToken);
+    $("activateUser").addEventListener("click", () => setUserActive(true));
+    $("deactivateUser").addEventListener("click", () => setUserActive(false));
+    $("revokeSelectedSession").addEventListener("click", revokeSelectedSession);
+    $("revokeAllSessions").addEventListener("click", revokeAllSessions);
 
     refreshAll();
   </script>

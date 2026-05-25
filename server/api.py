@@ -68,6 +68,9 @@ if BaseModel is object:
 
     class AdminSessionCreate(object):
         pass
+
+    class AdminUserStatusPut(object):
+        pass
 else:
     class UserCreate(BaseModel):
         login_id: str
@@ -129,6 +132,9 @@ else:
     class AdminSessionCreate(BaseModel):
         label: str = "admin-issued"
         expires_at: str = None
+
+    class AdminUserStatusPut(BaseModel):
+        is_active: bool
 
 
 def create_api():
@@ -398,6 +404,32 @@ def create_api():
             "expires_at": session["expires_at"],
             "created_at": session["created_at"],
         }
+
+    @app.put("/admin/users/{user_id}/status")
+    def admin_set_user_status(user_id: int, payload: AdminUserStatusPut, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        _require_user(user_id)
+        user = users.set_active(user_id, payload.is_active)
+        if not payload.is_active:
+            sessions.revoke_all_sessions(user_id)
+        return {
+            "user": user,
+            "sessions": sessions.list_sessions(user_id),
+        }
+
+    @app.delete("/admin/users/{user_id}/sessions/{session_id}")
+    def admin_revoke_user_session(user_id: int, session_id: int, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        _require_user(user_id)
+        sessions.revoke_session(user_id, session_id)
+        return {"revoked": True, "sessions": sessions.list_sessions(user_id)}
+
+    @app.post("/admin/users/{user_id}/sessions/revoke-all")
+    def admin_revoke_all_user_sessions(user_id: int, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        _require_user(user_id)
+        sessions.revoke_all_sessions(user_id)
+        return {"revoked": True, "sessions": sessions.list_sessions(user_id)}
 
     @app.get("/admin/gpt-logs")
     def admin_gpt_logs(limit: int = 100, x_admin_token: str = Header(None)):

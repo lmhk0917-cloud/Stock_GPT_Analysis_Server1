@@ -79,5 +79,16 @@ class SessionStore:
         )
         self.conn.commit()
 
+    def revoke_all_sessions(self, user_id):
+        self.conn.execute(
+            """
+            UPDATE user_sessions
+            SET revoked_at = ?
+            WHERE user_id = ? AND revoked_at IS NULL
+            """,
+            (utc_now(), user_id),
+        )
+        self.conn.commit()
+
     def hash_token(self, token):
         return hashlib.sha256(token.encode("utf-8")).hexdigest()

@@ -42,6 +42,45 @@ def main():
         headers={"X-User-Token": token},
         json={"content": "관리자 발급 토큰 smoke test"},
     )
+    revoked_one = client.delete(
+        "/admin/users/{}/sessions/{}".format(user_id, issued.json().get("session_id")),
+        headers=admin_headers,
+    )
+    revoked_token_chat = client.post(
+        "/users/{}/chat".format(user_id),
+        headers={"X-User-Token": token},
+        json={"content": "폐기된 토큰 smoke test"},
+    )
+    issued_second = client.post(
+        "/admin/users/{}/sessions".format(user_id),
+        headers=admin_headers,
+        json={"label": "admin-ui-smoke-second"},
+    )
+    second_token = issued_second.json().get("token") if issued_second.status_code == 200 else ""
+    deactivated = client.put(
+        "/admin/users/{}/status".format(user_id),
+        headers=admin_headers,
+        json={"is_active": False},
+    )
+    inactive_chat = client.post(
+        "/users/{}/chat".format(user_id),
+        headers={"X-User-Token": second_token},
+        json={"content": "비활성 사용자 smoke test"},
+    )
+    reactivated = client.put(
+        "/admin/users/{}/status".format(user_id),
+        headers=admin_headers,
+        json={"is_active": True},
+    )
+    issued_third = client.post(
+        "/admin/users/{}/sessions".format(user_id),
+        headers=admin_headers,
+        json={"label": "admin-ui-smoke-third"},
+    )
+    revoke_all = client.post(
+        "/admin/users/{}/sessions/revoke-all".format(user_id),
+        headers=admin_headers,
+    )
 
     checks = {
         "admin_ui": page.status_code == 200 and "Stock_GPT_Analysis_Server1 Admin" in page.text,
@@ -53,6 +92,14 @@ def main():
         "user_detail": detail.status_code == 200 and detail.json()["user"]["id"] == user_id,
         "issue_user_token": issued.status_code == 200 and bool(token),
         "issued_token_auth": user_chat.status_code == 200 and bool(user_chat.json().get("answer")),
+        "revoke_session": revoked_one.status_code == 200 and revoked_token_chat.status_code == 401,
+        "deactivate_user": deactivated.status_code == 200
+        and deactivated.json()["user"]["is_active"] == 0
+        and inactive_chat.status_code == 401,
+        "reactivate_user": reactivated.status_code == 200 and reactivated.json()["user"]["is_active"] == 1,
+        "revoke_all_sessions": issued_third.status_code == 200
+        and revoke_all.status_code == 200
+        and all(row["revoked_at"] for row in revoke_all.json()["sessions"]),
     }
 
     for name, ok in checks.items():

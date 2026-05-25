@@ -44,6 +44,14 @@ class UserStore:
     def get_user_by_login(self, login_id):
         return row_to_dict(self.conn.execute("SELECT * FROM users WHERE login_id = ?", (login_id,)).fetchone())
 
+    def set_active(self, user_id, is_active):
+        self.conn.execute(
+            "UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?",
+            (int(bool(is_active)), utc_now(), user_id),
+        )
+        self.conn.commit()
+        return self.get_user(user_id)
+
     def add_watchlist(self, user_id, code, name, market="KRX", enabled=True, sort_order=0):
         now = utc_now()
         self.conn.execute(
