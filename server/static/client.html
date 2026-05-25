@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock GPT Client</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --line: #d6dbe1;
+      --text: #161a1f;
+      --muted: #69737f;
+      --accent: #2563eb;
+      --accent-strong: #1d4ed8;
+      --danger: #b42318;
+      --soft: #eef4ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 22px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 650;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+      gap: 16px;
+      padding: 16px 22px 28px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    input,
+    textarea,
+    select,
+    button {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    button {
+      cursor: pointer;
+      background: #fff;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .status {
+      min-height: 19px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tabs button {
+      width: auto;
+      min-height: 32px;
+      padding-inline: 12px;
+    }
+
+    .tabs button.active {
+      border-color: var(--accent);
+      color: var(--accent-strong);
+    }
+
+    .chat {
+      display: grid;
+      gap: 10px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 3px;
+    }
+
+    .message {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .message.user {
+      background: var(--soft);
+    }
+
+    .message .role {
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      background: #fbfcfd;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .wrap {
+      max-width: 440px;
+      white-space: normal;
+      word-break: break-word;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 420px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+    }
+
+    @media (max-width: 860px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main,
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Stock_GPT_Analysis_Server1</h1>
+      <div class="status" id="headerStatus">사용자 토큰으로 접속</div>
+    </div>
+    <button class="primary" id="refreshProfile">새로고침</button>
+  </header>
+
+  <main>
+    <aside class="stack">
+      <div class="panel stack">
+        <h2>접속</h2>
+        <label>
+          User ID
+          <input id="userId" type="number" min="1" autocomplete="off">
+        </label>
+        <label>
+          User token
+          <input id="userToken" type="password" autocomplete="off" placeholder="X-User-Token">
+        </label>
+        <div class="row">
+          <button id="saveAccess">적용</button>
+          <button id="clearAccess">초기화</button>
+        </div>
+        <div class="status" id="accessStatus">토큰은 이 브라우저 세션에만 저장됩니다.</div>
+      </div>
+
+      <div class="panel stack">
+        <h2>관심종목</h2>
+        <div class="row">
+          <label>
+            Code
+            <input id="watchCode" type="text" autocomplete="off" placeholder="005930">
+          </label>
+          <label>
+            Market
+            <input id="watchMarket" type="text" autocomplete="off" value="KRX">
+          </label>
+        </div>
+        <label>
+          Name
+          <input id="watchName" type="text" autocomplete="off" placeholder="삼성전자">
+        </label>
+        <button id="addWatch">추가/갱신</button>
+        <div class="status" id="watchStatus"></div>
+      </div>
+
+      <div class="panel stack">
+        <h2>개인 메모리</h2>
+        <label>
+          Type
+          <select id="memoryType">
+            <option value="preference" selected>preference</option>
+            <option value="strategy">strategy</option>
+            <option value="risk">risk</option>
+            <option value="note">note</option>
+          </select>
+        </label>
+        <label>
+          Content
+          <textarea id="memoryContent" placeholder="예: 단기 과열 종목은 피하고 거래대금 증가를 우선 확인"></textarea>
+        </label>
+        <button id="addMemory">저장</button>
+        <div class="status" id="memoryStatus"></div>
+      </div>
+    </aside>
+
+    <section class="panel">
+      <div class="tabs">
+        <button class="active" data-view="chat">GPT 대화</button>
+        <button data-view="watchlist">관심종목</button>
+        <button data-view="memory">메모리</button>
+        <button data-view="reports">리포트</button>
+        <button data-view="profile">프로필</button>
+      </div>
+      <div id="content"></div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      userId: sessionStorage.getItem("clientUserId") || "",
+      token: sessionStorage.getItem("clientUserToken") || "",
+      view: "chat",
+      profile: null,
+      sessionId: null,
+      messages: [],
+    };
+
+    const $ = (id) => document.getElementById(id);
+    $("userId").value = state.userId;
+    $("userToken").value = state.token;
+
+    function headers() {
+      const result = {"Content-Type": "application/json"};
+      if (state.token) result["X-User-Token"] = state.token;
+      return result;
+    }
+
+    function status(id, text, isError = false) {
+      const el = $(id);
+      el.textContent = text;
+      el.classList.toggle("error", isError);
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {...headers(), ...(options.headers || {})},
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw new Error(data && data.detail ? data.detail : `${response.status} ${response.statusText}`);
+      }
+      return data;
+    }
+
+    function requireAccess() {
+      if (!state.userId || !state.token) {
+        throw new Error("User ID와 User token이 필요합니다.");
+      }
+    }
+
+    async function refreshProfile() {
+      try {
+        requireAccess();
+        state.profile = await api(`/users/${state.userId}/profile`);
+        status("accessStatus", `연결됨: ${state.profile.user.display_name}`);
+        status("headerStatus", `user_id=${state.userId}`);
+        renderView();
+      } catch (error) {
+        status("accessStatus", error.message, true);
+      }
+    }
+
+    function renderView() {
+      const map = {
+        chat: renderChat,
+        watchlist: renderWatchlist,
+        memory: renderMemory,
+        reports: renderReports,
+        profile: renderProfile,
+      };
+      map[state.view]();
+    }
+
+    function renderChat() {
+      $("content").innerHTML = `
+        <div class="stack">
+          <div class="chat" id="chatMessages">${state.messages.map(renderMessage).join("")}</div>
+          <label>
+            Message
+            <textarea id="chatInput" placeholder="관심종목과 내 메모리를 바탕으로 질문하세요."></textarea>
+          </label>
+          <button class="primary" id="sendChat">전송</button>
+          <div class="status" id="chatStatus"></div>
+        </div>`;
+      $("sendChat").addEventListener("click", sendChat);
+    }
+
+    function renderMessage(message) {
+      return `
+        <div class="message ${escapeHtml(message.role)}">
+          <div class="role">${escapeHtml(message.role)}</div>
+          ${escapeHtml(message.content)}
+        </div>`;
+    }
+
+    async function sendChat() {
+      const input = $("chatInput");
+      const content = input.value.trim();
+      if (!content) {
+        status("chatStatus", "메시지를 입력하세요.", true);
+        return;
+      }
+      try {
+        requireAccess();
+        state.messages.push({role: "user", content});
+        renderChat();
+        status("chatStatus", "응답 대기 중...");
+        const answer = await api(`/users/${state.userId}/chat`, {
+          method: "POST",
+          body: JSON.stringify({
+            content,
+            session_id: state.sessionId,
+            title: content.slice(0, 40) || "New chat",
+          }),
+        });
+        state.sessionId = answer.session_id || state.sessionId;
+        state.messages.push({role: "assistant", content: answer.answer || ""});
+        renderChat();
+        status("chatStatus", "완료");
+      } catch (error) {
+        status("chatStatus", error.message, true);
+      }
+    }
+
+    function renderWatchlist() {
+      const rows = state.profile ? state.profile.watchlist : [];
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "market", label: "Market"},
+        {key: "code", label: "Code"},
+        {key: "name", label: "Name"},
+        {key: "enabled", label: "Enabled"},
+        {key: "updated_at", label: "Updated"},
+      ]);
+    }
+
+    function renderMemory() {
+      const rows = state.profile ? state.profile.memory : [];
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "memory_type", label: "Type"},
+        {key: "visibility", label: "Visibility"},
+        {key: "content", label: "Content", wrap: true},
+        {key: "updated_at", label: "Updated"},
+      ]);
+    }
+
+    function renderReports() {
+      const rows = state.profile ? state.profile.reports : [];
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "market", label: "Market"},
+        {key: "code", label: "Code"},
+        {key: "analyzed_at", label: "Analyzed"},
+        {key: "model", label: "Model"},
+        {key: "gpt_result", label: "GPT", wrap: true},
+      ]);
+    }
+
+    function renderProfile() {
+      $("content").innerHTML = `<pre>${escapeHtml(JSON.stringify(state.profile || {}, null, 2))}</pre>`;
+    }
+
+    function renderTable(rows, columns) {
+      if (!rows || rows.length === 0) {
+        $("content").innerHTML = `<div class="status">표시할 데이터가 없습니다.</div>`;
+        return;
+      }
+      const head = columns.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
+      const body = rows.map((row) => `
+        <tr>${columns.map((col) => `<td class="${col.wrap ? "wrap" : ""}">${cell(row, col)}</td>`).join("")}</tr>
+      `).join("");
+      $("content").innerHTML = `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function cell(row, col) {
+      const value = row[col.key];
+      if (typeof value === "object" && value !== null) return escapeHtml(JSON.stringify(value));
+      return escapeHtml(value ?? "");
+    }
+
+    async function addWatch() {
+      try {
+        requireAccess();
+        await api(`/users/${state.userId}/watchlist`, {
+          method: "POST",
+          body: JSON.stringify({
+            market: $("watchMarket").value.trim() || "KRX",
+            code: $("watchCode").value.trim(),
+            name: $("watchName").value.trim(),
+            enabled: true,
+          }),
+        });
+        status("watchStatus", "저장됨");
+        await refreshProfile();
+      } catch (error) {
+        status("watchStatus", error.message, true);
+      }
+    }
+
+    async function addMemory() {
+      const text = $("memoryContent").value.trim();
+      if (!text) {
+        status("memoryStatus", "내용을 입력하세요.", true);
+        return;
+      }
+      try {
+        requireAccess();
+        await api(`/users/${state.userId}/memory`, {
+          method: "POST",
+          body: JSON.stringify({
+            memory_type: $("memoryType").value,
+            visibility: "private",
+            content: {text},
+          }),
+        });
+        $("memoryContent").value = "";
+        status("memoryStatus", "저장됨");
+        await refreshProfile();
+      } catch (error) {
+        status("memoryStatus", error.message, true);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    document.querySelectorAll(".tabs button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".tabs button").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        state.view = button.dataset.view;
+        renderView();
+      });
+    });
+
+    $("saveAccess").addEventListener("click", () => {
+      state.userId = $("userId").value.trim();
+      state.token = $("userToken").value.trim();
+      sessionStorage.setItem("clientUserId", state.userId);
+      sessionStorage.setItem("clientUserToken", state.token);
+      refreshProfile();
+    });
+
+    $("clearAccess").addEventListener("click", () => {
+      state.userId = "";
+      state.token = "";
+      state.profile = null;
+      state.sessionId = null;
+      state.messages = [];
+      $("userId").value = "";
+      $("userToken").value = "";
+      sessionStorage.removeItem("clientUserId");
+      sessionStorage.removeItem("clientUserToken");
+      status("accessStatus", "초기화됨");
+      renderView();
+    });
+
+    $("refreshProfile").addEventListener("click", refreshProfile);
+    $("addWatch").addEventListener("click", addWatch);
+    $("addMemory").addEventListener("click", addMemory);
+
+    renderView();
+    if (state.userId && state.token) refreshProfile();
+  </script>
+</body>
+</html>

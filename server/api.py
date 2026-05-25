@@ -163,6 +163,11 @@ def create_api():
         path = Path(__file__).resolve().parent / "static" / "admin.html"
         return HTMLResponse(path.read_text(encoding="utf-8"))
 
+    @app.get("/client/ui", response_class=HTMLResponse)
+    def client_ui():
+        path = Path(__file__).resolve().parent / "static" / "client.html"
+        return HTMLResponse(path.read_text(encoding="utf-8"))
+
     @app.post("/auth/login")
     def login(payload: LoginCreate):
         user = users.get_user_by_login(payload.login_id)
@@ -196,6 +201,18 @@ def create_api():
     def list_watchlist(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
         _require_user_access(user_id, x_user_token, x_admin_token)
         return users.list_watchlist(user_id)
+
+    @app.get("/users/{user_id}/profile")
+    def get_profile(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
+        return {
+            "user": users.get_user(user_id),
+            "settings": users.get_settings(user_id),
+            "watchlist": users.list_watchlist(user_id),
+            "memory": memory.list_memory(user_id),
+            "broker_credentials": _safe_credential_meta(user_id),
+            "reports": audit.reports_for_user(user_id),
+        }
 
     @app.post("/users/{user_id}/watchlist")
     def add_watchlist(user_id: int, payload: WatchCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):

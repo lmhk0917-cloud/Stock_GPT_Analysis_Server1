@@ -21,6 +21,7 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 - 관리자 요청 로그 저장
 - 사용자 메모리와 최신 분석 결과를 포함하는 GPT 채팅 gateway
 - 브라우저에서 확인 가능한 관리자 대시보드
+- 사용자 토큰으로 접속하는 테스트용 클라이언트 화면
 - FastAPI 미설치 환경에서도 확인 가능한 표준 라이브러리 개발용 HTTP 서버
 - FastAPI 확장용 API 파일 제공
 
@@ -88,6 +89,12 @@ C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_serv
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\admin_ui_smoke_test.py
 ```
 
+사용자 클라이언트 smoke test:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\client_ui_smoke_test.py
+```
+
 환경변수 점검:
 
 ```powershell
@@ -131,6 +138,14 @@ http://127.0.0.1:8000/admin/ui
 ```
 
 화면에서 `.env.local`의 `ADMIN_API_TOKEN`을 입력하면 사용자 목록, 요청 로그, GPT 호출 로그, 주문 요청, 사용자별 상세 정보를 조회할 수 있다. 테스트 사용자 생성과 사용자 접속 토큰 발급도 이 화면에서 처리할 수 있다. 관리자 토큰은 브라우저 `sessionStorage`에만 저장되며, 발급된 사용자 토큰은 한 번만 표시된다.
+
+사용자 테스트 화면:
+
+```text
+http://127.0.0.1:8000/client/ui
+```
+
+관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다.
 
 키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
 
