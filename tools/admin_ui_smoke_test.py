@@ -31,6 +31,17 @@ def main():
     gpt = client.get("/admin/gpt-logs?limit=10", headers=admin_headers)
     orders = client.get("/admin/orders?limit=10", headers=admin_headers)
     detail = client.get("/admin/users/{}/details".format(user_id), headers=admin_headers)
+    issued = client.post(
+        "/admin/users/{}/sessions".format(user_id),
+        headers=admin_headers,
+        json={"label": "admin-ui-smoke"},
+    )
+    token = issued.json().get("token") if issued.status_code == 200 else ""
+    user_chat = client.post(
+        "/users/{}/chat".format(user_id),
+        headers={"X-User-Token": token},
+        json={"content": "관리자 발급 토큰 smoke test"},
+    )
 
     checks = {
         "admin_ui": page.status_code == 200 and "Stock_GPT_Analysis_Server1 Admin" in page.text,
@@ -40,6 +51,8 @@ def main():
         "gpt_logs": gpt.status_code == 200 and isinstance(gpt.json(), list),
         "orders": orders.status_code == 200 and isinstance(orders.json(), list),
         "user_detail": detail.status_code == 200 and detail.json()["user"]["id"] == user_id,
+        "issue_user_token": issued.status_code == 200 and bool(token),
+        "issued_token_auth": user_chat.status_code == 200 and bool(user_chat.json().get("answer")),
     }
 
     for name, ok in checks.items():

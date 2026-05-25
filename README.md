@@ -130,7 +130,7 @@ FastAPI 정식 API 서버:
 http://127.0.0.1:8000/admin/ui
 ```
 
-화면에서 `.env.local`의 `ADMIN_API_TOKEN`을 입력하면 사용자 목록, 요청 로그, GPT 호출 로그, 주문 요청, 사용자별 상세 정보를 조회할 수 있다. 토큰은 브라우저 `sessionStorage`에만 저장된다.
+화면에서 `.env.local`의 `ADMIN_API_TOKEN`을 입력하면 사용자 목록, 요청 로그, GPT 호출 로그, 주문 요청, 사용자별 상세 정보를 조회할 수 있다. 테스트 사용자 생성과 사용자 접속 토큰 발급도 이 화면에서 처리할 수 있다. 관리자 토큰은 브라우저 `sessionStorage`에만 저장되며, 발급된 사용자 토큰은 한 번만 표시된다.
 
 키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
 

@@ -295,6 +295,42 @@
       </div>
 
       <div class="panel stack">
+        <h2>사용자 생성</h2>
+        <label>
+          Login ID
+          <input id="newLoginId" type="text" autocomplete="off" placeholder="tester01">
+        </label>
+        <label>
+          Display name
+          <input id="newDisplayName" type="text" autocomplete="off" placeholder="Tester 01">
+        </label>
+        <label>
+          Role
+          <select id="newRole">
+            <option value="user" selected>user</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+        <button id="createUser">사용자 저장</button>
+        <div class="status" id="userCreateStatus"></div>
+      </div>
+
+      <div class="panel stack">
+        <h2>사용자 토큰</h2>
+        <label>
+          Label
+          <input id="sessionLabel" type="text" autocomplete="off" value="private-beta">
+        </label>
+        <label>
+          Expires at
+          <input id="sessionExpires" type="text" autocomplete="off" placeholder="선택 사항, ISO 시간">
+        </label>
+        <button id="issueUserToken">토큰 발급</button>
+        <div class="status" id="tokenIssueStatus"></div>
+        <pre id="issuedToken"></pre>
+      </div>
+
+      <div class="panel stack">
         <h2>필터</h2>
         <label>
           User ID
@@ -445,6 +481,59 @@
       ]);
     }
 
+    async function createUser() {
+      const loginId = $("newLoginId").value.trim();
+      const displayName = $("newDisplayName").value.trim();
+      if (!loginId || !displayName) {
+        status("userCreateStatus", "Login ID와 Display name이 필요합니다.", true);
+        return;
+      }
+      try {
+        status("userCreateStatus", "저장 중...");
+        const user = await api("/users", {
+          method: "POST",
+          body: JSON.stringify({
+            login_id: loginId,
+            display_name: displayName,
+            role: $("newRole").value,
+          }),
+        });
+        $("userIdFilter").value = user.id;
+        status("userCreateStatus", `저장됨: user_id=${user.id}`);
+        await refreshAll();
+      } catch (error) {
+        status("userCreateStatus", error.message, true);
+      }
+    }
+
+    async function issueUserToken() {
+      const userId = $("userIdFilter").value || (state.users[0] && state.users[0].id);
+      if (!userId) {
+        status("tokenIssueStatus", "User ID를 입력하거나 사용자를 먼저 생성하세요.", true);
+        return;
+      }
+      try {
+        status("tokenIssueStatus", "발급 중...");
+        const session = await api(`/admin/users/${userId}/sessions`, {
+          method: "POST",
+          body: JSON.stringify({
+            label: $("sessionLabel").value.trim() || "admin-issued",
+            expires_at: $("sessionExpires").value.trim() || null,
+          }),
+        });
+        $("issuedToken").textContent = JSON.stringify({
+          user_id: session.user_id,
+          session_id: session.session_id,
+          token: session.token,
+          expires_at: session.expires_at,
+        }, null, 2);
+        status("tokenIssueStatus", "발급 완료. 이 토큰은 다시 조회할 수 없습니다.");
+        await refreshAll();
+      } catch (error) {
+        status("tokenIssueStatus", error.message, true);
+      }
+    }
+
     async function refreshRequests() {
       const params = qs({limit: $("limitFilter").value, user_id: $("userIdFilter").value});
       const rows = await api(`/admin/request-logs?${params}`);
@@ -575,6 +664,8 @@
     $("userIdFilter").addEventListener("change", refreshView);
     $("runAnalysis").addEventListener("click", () => runAction("/admin/run-analysis", "분석"));
     $("runBackfill").addEventListener("click", () => runAction("/admin/run-backfill", "백필"));
+    $("createUser").addEventListener("click", createUser);
+    $("issueUserToken").addEventListener("click", issueUserToken);
 
     refreshAll();
   </script>

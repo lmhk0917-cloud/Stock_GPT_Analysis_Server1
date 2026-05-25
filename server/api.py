@@ -65,6 +65,9 @@ if BaseModel is object:
 
     class ChatAskCreate(object):
         pass
+
+    class AdminSessionCreate(object):
+        pass
 else:
     class UserCreate(BaseModel):
         login_id: str
@@ -122,6 +125,10 @@ else:
         content: str
         session_id: int = None
         title: str = None
+
+    class AdminSessionCreate(BaseModel):
+        label: str = "admin-issued"
+        expires_at: str = None
 
 
 def create_api():
@@ -360,6 +367,20 @@ def create_api():
     def admin_request_logs(limit: int = 100, user_id: int = None, x_admin_token: str = Header(None)):
         _require_admin(x_admin_token)
         return request_audit.list_logs(limit=limit, user_id=user_id)
+
+    @app.post("/admin/users/{user_id}/sessions")
+    def admin_issue_user_session(user_id: int, payload: AdminSessionCreate, x_admin_token: str = Header(None)):
+        _require_admin(x_admin_token)
+        _require_user(user_id)
+        session = sessions.create_session(user_id, label=payload.label, expires_at=payload.expires_at)
+        return {
+            "user_id": user_id,
+            "session_id": session["id"],
+            "token": session["token"],
+            "label": session["label"],
+            "expires_at": session["expires_at"],
+            "created_at": session["created_at"],
+        }
 
     @app.get("/admin/gpt-logs")
     def admin_gpt_logs(limit: int = 100, x_admin_token: str = Header(None)):
