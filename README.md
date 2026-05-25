@@ -87,6 +87,12 @@ C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_serv
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\env_check.py
 ```
 
+DB migration 상태 점검:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\migration_check.py
+```
+
 SQLite DB 백업:
 
 ```powershell

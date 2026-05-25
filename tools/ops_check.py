@@ -38,6 +38,7 @@ def main():
     os.environ.setdefault("CREDENTIAL_MASTER_KEY", "local-ops-check-master-key")
     run_step("runtime", ["tools/runtime_check.py"])
     run_step("env", ["tools/env_check.py"], live_openai=args.live_openai)
+    run_step("migrations", ["tools/migration_check.py"])
     run_step("compile", ["-m", "compileall", "-q", "."])
     run_step("stability", ["tools/stability_check.py"])
     run_step("http", ["tools/server_smoke_test.py"])

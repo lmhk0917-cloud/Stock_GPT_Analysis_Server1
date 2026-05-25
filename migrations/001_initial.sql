@@ -1,15 +1,3 @@
-"""SQLite schema and small connection helpers."""
-
-import json
-import sqlite3
-from datetime import datetime
-
-from app.config import get_db_path
-
-
-SCHEMA = """
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   login_id TEXT NOT NULL UNIQUE,
@@ -233,43 +221,3 @@ CREATE TABLE IF NOT EXISTS user_report_views (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(analysis_result_id) REFERENCES analysis_results(id) ON DELETE CASCADE
 );
-"""
-
-
-def utc_now():
-    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-
-
-def connect(db_path=None):
-    path = str(db_path or get_db_path())
-    conn = sqlite3.connect(path, timeout=30, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
-
-
-def init_db(db_path=None):
-    conn = connect(db_path)
-    try:
-        from core.migrations import run_migrations
-
-        run_migrations(conn)
-        return conn
-    except Exception:
-        conn.close()
-        raise
-
-
-def row_to_dict(row):
-    return dict(row) if row is not None else None
-
-
-def dumps_json(value):
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
-
-
-def loads_json(value, default=None):
-    if value in (None, ""):
-        return default
-    return json.loads(value)
