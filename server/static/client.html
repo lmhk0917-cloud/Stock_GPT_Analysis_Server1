@@ -370,6 +370,7 @@
       token: sessionStorage.getItem("clientUserToken") || "",
       view: "chat",
       profile: null,
+      providers: [],
       sessionId: null,
       messages: [],
     };
@@ -412,6 +413,7 @@
     async function refreshProfile() {
       try {
         requireAccess();
+        if (state.providers.length === 0) await loadBrokerProviders();
         state.profile = await api(`/users/${state.userId}/profile`);
         status("accessStatus", `연결됨: ${state.profile.user.display_name}`);
         status("headerStatus", `user_id=${state.userId}`);
@@ -419,6 +421,33 @@
       } catch (error) {
         status("accessStatus", error.message, true);
       }
+    }
+
+    async function loadBrokerProviders() {
+      state.providers = await api("/broker-providers");
+      const providerSelect = $("brokerProvider");
+      const currentProvider = providerSelect.value;
+      providerSelect.innerHTML = state.providers.map((provider) => `
+        <option value="${escapeHtml(provider.id)}">${escapeHtml(provider.label)}</option>
+      `).join("");
+      if (state.providers.some((provider) => provider.id === currentProvider)) {
+        providerSelect.value = currentProvider;
+      }
+      updateBrokerEnvironmentOptions();
+    }
+
+    function updateBrokerEnvironmentOptions() {
+      const selected = state.providers.find((provider) => provider.id === $("brokerProvider").value);
+      const environments = selected ? selected.environments : ["paper"];
+      const environmentSelect = $("brokerEnvironment");
+      const currentEnvironment = environmentSelect.value;
+      environmentSelect.innerHTML = environments.map((environment) => `
+        <option value="${escapeHtml(environment)}">${escapeHtml(environment)}</option>
+      `).join("");
+      if (environments.includes(currentEnvironment)) {
+        environmentSelect.value = currentEnvironment;
+      }
+      status("brokerStatus", selected ? selected.notes : "");
     }
 
     function renderView() {
@@ -672,8 +701,10 @@
     $("addWatch").addEventListener("click", addWatch);
     $("addMemory").addEventListener("click", addMemory);
     $("saveBroker").addEventListener("click", saveBrokerCredential);
+    $("brokerProvider").addEventListener("change", updateBrokerEnvironmentOptions);
 
     renderView();
+    loadBrokerProviders().catch((error) => status("brokerStatus", error.message, true));
     if (state.userId && state.token) refreshProfile();
   </script>
 </body>

@@ -34,6 +34,8 @@ def main():
     token = issued.json().get("token") if issued.status_code == 200 else ""
     user_headers = {"X-User-Token": token}
 
+    providers = client.get("/broker-providers")
+    provider_ids = [item["id"] for item in providers.json()] if providers.status_code == 200 else []
     profile_empty = client.get("/users/{}/profile".format(user_id), headers=user_headers)
     watch = client.post(
         "/users/{}/watchlist".format(user_id),
@@ -58,6 +60,29 @@ def main():
             "can_order": False,
         },
     )
+    invalid_credential = client.put(
+        "/users/{}/broker-credentials".format(user_id),
+        headers=user_headers,
+        json={
+            "provider": "kis_rest",
+            "environment": "unsupported",
+            "app_key": "bad",
+            "app_secret": "bad",
+        },
+    )
+    kiwoom_alias_credential = client.put(
+        "/users/{}/broker-credentials".format(user_id),
+        headers=user_headers,
+        json={
+            "provider": "kiwoom",
+            "environment": "live",
+            "app_key": "kiwoom-app-key",
+            "app_secret": "kiwoom-app-secret",
+            "account_no": "00000000",
+            "can_read": True,
+            "can_order": False,
+        },
+    )
     chat = client.post(
         "/users/{}/chat".format(user_id),
         headers=user_headers,
@@ -69,6 +94,8 @@ def main():
     profile_json = profile.json() if profile.status_code == 200 else {}
     checks = {
         "client_ui": page.status_code == 200 and "Stock_GPT_Analysis_Server1" in page.text,
+        "broker_providers": providers.status_code == 200
+        and {"mock", "kis_rest", "kiwoom_legacy"}.issubset(set(provider_ids)),
         "user": user.status_code == 200 and bool(user_id),
         "issue_user_token": issued.status_code == 200 and bool(token),
         "profile_empty": profile_empty.status_code == 200,
@@ -78,6 +105,9 @@ def main():
         and len(credential.json()) >= 1
         and "app_key" not in credential.text
         and "client-ui-smoke-app-key" not in credential.text,
+        "invalid_broker_environment": invalid_credential.status_code == 400,
+        "kiwoom_alias_credential": kiwoom_alias_credential.status_code == 200
+        and any(row["provider"] == "kiwoom_legacy" for row in kiwoom_alias_credential.json()),
         "chat": chat.status_code == 200 and bool(chat.json().get("answer")),
         "profile": profile.status_code == 200
         and len(profile_json.get("watchlist", [])) >= 1

@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 from broker.order_service import OrderService
+from broker.provider_registry import list_broker_providers, validate_provider_environment
 from server.auth import require_admin_token, require_user_token
 from server.chat_service import ChatService
 from core.database import init_db
@@ -187,6 +188,10 @@ def create_api():
             "expires_at": session["expires_at"],
         }
 
+    @app.get("/broker-providers")
+    def broker_providers():
+        return list_broker_providers()
+
     @app.get("/users")
     def list_users(x_admin_token: str = Header(None)):
         _require_admin(x_admin_token)
@@ -303,10 +308,14 @@ def create_api():
     @app.put("/users/{user_id}/broker-credentials")
     def put_broker_credentials(user_id: int, payload: BrokerCredentialPut, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
         _require_user_access(user_id, x_user_token, x_admin_token)
+        try:
+            provider_meta = validate_provider_environment(payload.provider, payload.environment)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         store = _credential_store()
         store.upsert_credentials(
             user_id,
-            payload.provider,
+            provider_meta["id"],
             payload.app_key,
             payload.app_secret,
             account_no=payload.account_no,

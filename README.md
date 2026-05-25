@@ -10,6 +10,7 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 - 공통 시장 데이터와 사용자별 데이터를 분리한 DB 스키마
 - Kiwoom/QAxWidget 의존을 adapter 경계 밖으로 격리
 - KIS REST adapter 뼈대 추가
+- 선택 가능한 증권사 provider registry 추가 (`mock`, `kis_rest`, `kiwoom_legacy`)
 - 키움 OpenAPI+는 legacy worker 전용으로 분리
 - `mock_adapter.py` 기반 오프라인 시세 생성
 - 공통 분석 결과를 사용자 watchlist 기준으로 필터링
@@ -145,7 +146,7 @@ http://127.0.0.1:8000/admin/ui
 http://127.0.0.1:8000/client/ui
 ```
 
-관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 증권사 API credential 암호화 저장, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다. 증권사 API key/secret/account 원문은 저장 요청에만 사용되고, 조회 화면에는 메타데이터만 표시된다.
+관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 증권사 API provider 선택 및 credential 암호화 저장, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다. 증권사 API key/secret/account 원문은 저장 요청에만 사용되고, 조회 화면에는 메타데이터만 표시된다.
 
 키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
 

@@ -12,6 +12,7 @@ os.environ.setdefault("CREDENTIAL_MASTER_KEY", "local-stability-check-master-key
 os.environ["OPENAI_API_KEY"] = ""
 
 from broker.order_service import OrderService
+from broker.provider_registry import list_broker_providers
 from core.credential_store import BrokerCredentialStore
 from core.database import init_db
 from core.memory_store import UserMemoryStore
@@ -59,6 +60,7 @@ def main():
         approval_text="주문 위험을 확인했고 실행을 승인합니다",
     )
     adapter = create_market_data_adapter("mock")
+    provider_ids = [item["id"] for item in list_broker_providers()]
     quote = adapter.get_quote("KRX", "005930")
     results = run_once(conn, users, use_gpt=False)
 
@@ -85,6 +87,7 @@ def main():
         "request_audit": request_log_count == 1,
         "chat_gateway": gpt_log_count >= 1,
         "adapter_factory": quote["provider"] == "mock",
+        "broker_provider_registry": {"mock", "kis_rest", "kiwoom_legacy"}.issubset(set(provider_ids)),
         "analysis_results": result_count == len(results),
         "events": event_count > 0,
         "notifications": notification_count > 0,
