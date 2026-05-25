@@ -298,6 +298,57 @@
         <button id="addMemory">저장</button>
         <div class="status" id="memoryStatus"></div>
       </div>
+
+      <div class="panel stack">
+        <h2>증권사 API</h2>
+        <div class="row">
+          <label>
+            Provider
+            <select id="brokerProvider">
+              <option value="kis_rest" selected>KIS REST</option>
+              <option value="kiwoom_legacy">Kiwoom legacy</option>
+              <option value="mock">mock</option>
+            </select>
+          </label>
+          <label>
+            Environment
+            <select id="brokerEnvironment">
+              <option value="paper" selected>paper</option>
+              <option value="live">live</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          App key
+          <input id="brokerAppKey" type="password" autocomplete="off">
+        </label>
+        <label>
+          App secret
+          <input id="brokerAppSecret" type="password" autocomplete="off">
+        </label>
+        <label>
+          Account no
+          <input id="brokerAccountNo" type="password" autocomplete="off" placeholder="선택 사항">
+        </label>
+        <div class="row">
+          <label>
+            Read
+            <select id="brokerCanRead">
+              <option value="true" selected>enabled</option>
+              <option value="false">disabled</option>
+            </select>
+          </label>
+          <label>
+            Order
+            <select id="brokerCanOrder">
+              <option value="false" selected>disabled</option>
+              <option value="true">enabled</option>
+            </select>
+          </label>
+        </div>
+        <button id="saveBroker">암호화 저장</button>
+        <div class="status" id="brokerStatus"></div>
+      </div>
     </aside>
 
     <section class="panel">
@@ -305,6 +356,7 @@
         <button class="active" data-view="chat">GPT 대화</button>
         <button data-view="watchlist">관심종목</button>
         <button data-view="memory">메모리</button>
+        <button data-view="credentials">증권사 API</button>
         <button data-view="reports">리포트</button>
         <button data-view="profile">프로필</button>
       </div>
@@ -374,6 +426,7 @@
         chat: renderChat,
         watchlist: renderWatchlist,
         memory: renderMemory,
+        credentials: renderCredentials,
         reports: renderReports,
         profile: renderProfile,
       };
@@ -450,6 +503,19 @@
         {key: "memory_type", label: "Type"},
         {key: "visibility", label: "Visibility"},
         {key: "content", label: "Content", wrap: true},
+        {key: "updated_at", label: "Updated"},
+      ]);
+    }
+
+    function renderCredentials() {
+      const rows = state.profile ? state.profile.broker_credentials : [];
+      renderTable(rows, [
+        {key: "id", label: "ID"},
+        {key: "provider", label: "Provider"},
+        {key: "environment", label: "Env"},
+        {key: "can_read", label: "Read"},
+        {key: "can_order", label: "Order"},
+        {key: "is_active", label: "Active"},
         {key: "updated_at", label: "Updated"},
       ]);
     }
@@ -531,6 +597,37 @@
       }
     }
 
+    async function saveBrokerCredential() {
+      const appKey = $("brokerAppKey").value;
+      const appSecret = $("brokerAppSecret").value;
+      if (!appKey || !appSecret) {
+        status("brokerStatus", "App key와 App secret이 필요합니다.", true);
+        return;
+      }
+      try {
+        requireAccess();
+        await api(`/users/${state.userId}/broker-credentials`, {
+          method: "PUT",
+          body: JSON.stringify({
+            provider: $("brokerProvider").value,
+            environment: $("brokerEnvironment").value,
+            app_key: appKey,
+            app_secret: appSecret,
+            account_no: $("brokerAccountNo").value || null,
+            can_read: $("brokerCanRead").value === "true",
+            can_order: $("brokerCanOrder").value === "true",
+          }),
+        });
+        $("brokerAppKey").value = "";
+        $("brokerAppSecret").value = "";
+        $("brokerAccountNo").value = "";
+        status("brokerStatus", "암호화 저장됨. 원문 키는 다시 표시되지 않습니다.");
+        await refreshProfile();
+      } catch (error) {
+        status("brokerStatus", error.message, true);
+      }
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replaceAll("&", "&amp;")
@@ -574,6 +671,7 @@
     $("refreshProfile").addEventListener("click", refreshProfile);
     $("addWatch").addEventListener("click", addWatch);
     $("addMemory").addEventListener("click", addMemory);
+    $("saveBroker").addEventListener("click", saveBrokerCredential);
 
     renderView();
     if (state.userId && state.token) refreshProfile();

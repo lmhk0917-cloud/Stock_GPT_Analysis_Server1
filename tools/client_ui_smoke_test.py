@@ -45,6 +45,19 @@ def main():
         headers=user_headers,
         json={"memory_type": "preference", "content": {"text": "Prefer liquid large caps"}},
     )
+    credential = client.put(
+        "/users/{}/broker-credentials".format(user_id),
+        headers=user_headers,
+        json={
+            "provider": "kis_rest",
+            "environment": "paper",
+            "app_key": "client-ui-smoke-app-key",
+            "app_secret": "client-ui-smoke-app-secret",
+            "account_no": "00000000",
+            "can_read": True,
+            "can_order": False,
+        },
+    )
     chat = client.post(
         "/users/{}/chat".format(user_id),
         headers=user_headers,
@@ -61,10 +74,16 @@ def main():
         "profile_empty": profile_empty.status_code == 200,
         "watchlist": watch.status_code == 200 and len(watch.json()) >= 1,
         "memory": memory.status_code == 200 and len(memory.json()) >= 1,
+        "broker_credentials": credential.status_code == 200
+        and len(credential.json()) >= 1
+        and "app_key" not in credential.text
+        and "client-ui-smoke-app-key" not in credential.text,
         "chat": chat.status_code == 200 and bool(chat.json().get("answer")),
         "profile": profile.status_code == 200
         and len(profile_json.get("watchlist", [])) >= 1
-        and len(profile_json.get("memory", [])) >= 1,
+        and len(profile_json.get("memory", [])) >= 1
+        and len(profile_json.get("broker_credentials", [])) >= 1
+        and "client-ui-smoke-app-secret" not in profile.text,
         "unauthorized": unauthorized.status_code == 401,
     }
 

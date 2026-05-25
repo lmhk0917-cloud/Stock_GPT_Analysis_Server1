@@ -145,7 +145,7 @@ http://127.0.0.1:8000/admin/ui
 http://127.0.0.1:8000/client/ui
 ```
 
-관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다.
+관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 증권사 API credential 암호화 저장, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다. 증권사 API key/secret/account 원문은 저장 요청에만 사용되고, 조회 화면에는 메타데이터만 표시된다.
 
 키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
 
