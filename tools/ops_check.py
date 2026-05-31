@@ -40,6 +40,7 @@ def main():
     run_step("env", ["tools/env_check.py"], live_openai=args.live_openai)
     run_step("migrations", ["tools/migration_check.py"])
     run_step("compile", ["-m", "compileall", "-q", "."])
+    run_step("kiwoom-spool", ["tools/kiwoom_spool_smoke_test.py"])
     run_step("stability", ["tools/stability_check.py"])
     run_step("http", ["tools/server_smoke_test.py"])
     run_step("fastapi", ["tools/fastapi_smoke_test.py"])

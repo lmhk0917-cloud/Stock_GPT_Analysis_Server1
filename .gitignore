@@ -25,6 +25,7 @@ data/*.db
 data/*.db-*
 data/*.sqlite
 data/*.sqlite-*
+data/kiwoom_spool/
 *.log
 logs/
 

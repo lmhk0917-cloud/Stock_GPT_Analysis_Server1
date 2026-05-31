@@ -12,6 +12,7 @@ Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서
 - KIS REST adapter 뼈대 추가
 - 선택 가능한 증권사 provider registry 추가 (`mock`, `kis_rest`, `kiwoom_legacy`)
 - 키움 OpenAPI+는 legacy worker 전용으로 분리
+- 키움 `py37_32` worker의 실시간 체결 JSONL spool 및 서버 import 경계 추가
 - `mock_adapter.py` 기반 오프라인 시세 생성
 - 공통 분석 결과를 사용자 watchlist 기준으로 필터링
 - console 알림 로그 저장
@@ -154,7 +155,20 @@ http://127.0.0.1:8000/client/ui
 .\scripts\run_kiwoom_legacy_worker.ps1
 ```
 
-현재 `py37_32` 환경은 서버 본체가 아니라 키움 legacy 확인용으로만 사용한다.
+키움 worker는 `py37_32`에서 QAxWidget 로그인을 수행하고 실시간 체결을 `data\kiwoom_spool\kiwoom_ticks.jsonl`에 기록한다. 서버 DB import는 Python 3.11 환경에서 별도로 실행한다.
+
+```powershell
+.\scripts\run_kiwoom_legacy_worker.ps1 --codes 005930,000660 --seconds 60
+.\scripts\import_kiwoom_spool.ps1
+```
+
+오프라인 spool/import 검증:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\kiwoom_spool_smoke_test.py
+```
+
+현재 `py37_32` 환경은 서버 본체가 아니라 키움 legacy worker 실행용으로만 사용한다. 실제 정규장 실시간 tick 수집 검증은 장중에 수행해야 한다.
 
 ## 복사/제외 원칙
 
