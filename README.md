@@ -1,175 +1,205 @@
 # Stock_GPT_Analysis_Server1
 
-Kiwoom/OpenAI 개인용 주가 분석 프로젝트를 기반으로 분리한 서버형 멀티유저 MVP다. 초기 목표는 소수 사용자가 각자 관심종목, 설정, 알림 조건을 갖고 접속하되, 시장 데이터 수집과 공통 분석 결과는 서버가 한 번만 생성해 공유하는 구조다.
+Private multi-user stock-analysis server that combines broker data adapters, per-user settings, encrypted credentials, operational dashboards, and OpenAI-powered analysis.
 
-서버 본체는 `Python 3.11+ 64-bit` 기준으로 정리했다. `py37_32`는 키움 OpenAPI+가 필요할 때만 `legacy/kiwoom_worker.py`에서 별도 프로세스로 유지한다.
+This project started from a personal Kiwoom OpenAPI+ analysis app and was split into a server-first architecture. The important engineering decision is that the main web server runs on modern 64-bit Python, while legacy Windows-only broker runtimes stay isolated behind explicit adapter and spool boundaries.
 
-## 현재 범위
+> Status: server MVP and offline validation are implemented. Live Kiwoom regular-session tick verification and external Cloudflare deployment are planned for the dedicated server PC stage.
 
-- SQLite 기반 `users`, `user_watchlists`, `user_settings`, `user_alert_rules` 추가
-- 공통 시장 데이터와 사용자별 데이터를 분리한 DB 스키마
-- Kiwoom/QAxWidget 의존을 adapter 경계 밖으로 격리
-- KIS REST adapter 뼈대 추가
-- 선택 가능한 증권사 provider registry 추가 (`mock`, `kis_rest`, `kiwoom_legacy`)
-- 키움 OpenAPI+는 legacy worker 전용으로 분리
-- 키움 `py37_32` worker의 실시간 체결 JSONL spool 및 서버 import 경계 추가
-- `mock_adapter.py` 기반 오프라인 시세 생성
-- 공통 분석 결과를 사용자 watchlist 기준으로 필터링
-- console 알림 로그 저장
-- 사용자별 broker API credential 암호화 저장
-- 주문 요청 scaffold 추가, 기본 비활성화
-- 주문 승인 문구 요구 기능 추가
-- 사용자별 메모리와 채팅 세션/메시지 저장
-- 관리자 요청 로그 저장
-- 사용자 메모리와 최신 분석 결과를 포함하는 GPT 채팅 gateway
-- 브라우저에서 확인 가능한 관리자 대시보드
-- 사용자 토큰으로 접속하는 테스트용 클라이언트 화면
-- FastAPI 미설치 환경에서도 확인 가능한 표준 라이브러리 개발용 HTTP 서버
-- FastAPI 확장용 API 파일 제공
+As a student project, this repository is intentionally realistic about current constraints: full-time server operation, broker account approvals, market-hours live testing, and external infrastructure are difficult to complete immediately without a dedicated PC and stable operating budget. The value of the project is that the roadmap is already concrete: the runtime boundaries, security model, validation commands, broker abstraction, and deployment sequence are defined so the system can move from private MVP to always-on server in controlled steps.
 
-자동매매와 실제 주문 실행은 초기 범위에서 제외하되, 주문 요청/승인/차단 로그 구조는 만들어두었다. 외부 공개나 유료 제공 단계에서는 법률/약관 검토가 필요하다.
+## Portfolio Highlights
 
-## 보안/주문 기본값
+- Built a FastAPI/SQLite multi-user backend with admin and client web UIs.
+- Separated shared market data from per-user memory, watchlists, settings, sessions, and broker credentials.
+- Added encrypted broker credential storage with user-level provider selection.
+- Implemented a disabled-by-default order request scaffold with optional approval phrase gating.
+- Integrated OpenAI as a review and explanation layer, not as an uncontrolled trading trigger.
+- Designed provider-neutral broker support for `mock`, Korea Investment REST, and Kiwoom legacy OpenAPI+.
+- Isolated Kiwoom's special `py37_32` + QAxWidget runtime through a JSONL spool and idempotent importer.
+- Added operational smoke tests for runtime, migrations, API auth, UI pages, OpenAI, and Kiwoom spool import.
 
-증권사 API 키 저장에는 `CREDENTIAL_MASTER_KEY`가 필요하다. 이 값이 없으면 broker credential 저장 API는 실패한다. 실제 주문 실행은 `ENABLE_ORDER_API=0`이 기본값이라 차단된다. 나중에 주문 adapter를 붙이더라도 `REQUIRE_ORDER_CONFIRMATION=1`이면 `ORDER_CONFIRMATION_TEXT`와 동일한 승인 문구가 들어온 요청만 다음 단계로 넘어간다.
+## Architecture
 
-## 로컬 API 키 설정
+```mermaid
+flowchart LR
+    Client["User browser<br/>/client/ui"] --> API["FastAPI server<br/>Python 3.11 64-bit"]
+    Admin["Admin browser<br/>/admin/ui"] --> API
+    API --> DB[("SQLite<br/>users, sessions, memory,<br/>market data, logs")]
+    API --> GPT["OpenAI API<br/>server-managed key"]
+    API --> Providers["Broker provider registry"]
+    Providers --> Mock["mock provider"]
+    Providers --> KIS["KIS REST adapter<br/>planned/live-key ready"]
+    Providers --> KiwoomImport["Kiwoom spool importer<br/>Python 3.11"]
+    KiwoomWorker["Kiwoom legacy worker<br/>py37_32 + QAxWidget"] --> Spool["JSONL spool<br/>data/kiwoom_spool"]
+    Spool --> KiwoomImport
+    KiwoomImport --> DB
+```
 
-OpenAI API 키를 직접 발급받은 뒤에는 `.env.local.example`을 `.env.local`로 복사하고 `OPENAI_API_KEY` 값을 채운다. `.env.local`은 `.gitignore`로 제외되어 GitHub에 올라가지 않는다.
+## Implemented Features
+
+- Multi-user account model: users, sessions, revocation, deactivate/reactivate.
+- Admin UI: user lifecycle controls, request logs, GPT logs, order requests, user detail views.
+- Client UI: GPT chat, watchlist management, private memory, broker provider selection, credential save flow.
+- Per-user private memory: server injects user-specific context into GPT chat requests.
+- Shared analysis path: common market data and analysis results can be filtered by each user's watchlist.
+- Provider registry: `mock`, `kis_rest`, and `kiwoom_legacy` are selectable through a common interface.
+- Secure defaults: local secrets are excluded from git; broker credentials require `CREDENTIAL_MASTER_KEY`.
+- Order safety: `ENABLE_ORDER_API=0` by default; `REQUIRE_ORDER_CONFIRMATION=1` can require an exact approval phrase.
+- Kiwoom legacy boundary: 32-bit worker writes realtime tick events to JSONL, Python 3.11 importer stores them in SQLite.
+- Operational checks: one-command `tools/ops_check.py` runs the core offline readiness suite.
+
+## Tech Stack
+
+- Python 3.11, FastAPI, Uvicorn
+- SQLite with migration scripts
+- OpenAI API
+- Windows PowerShell run scripts
+- Kiwoom OpenAPI+ isolated in Python 3.7 32-bit
+- Minimal HTML/CSS/JavaScript admin and client screens
+
+## Repository Layout
+
+```text
+app/             application config and environment loading
+server/          FastAPI app and HTTP routes
+core/            database, migrations, auth, crypto helpers
+broker/          provider registry and broker adapter contracts
+analysis/        shared analysis pipeline
+market_data/     mock and broker-backed market data access
+legacy/          Kiwoom py37_32 worker and spool importer
+tools/           smoke tests, ops checks, backup/status utilities
+scripts/         PowerShell launchers
+docs/            architecture and runtime notes
+migrations/      SQLite migration SQL
+data/            local runtime data, ignored by git
+```
+
+## Local Setup
+
+```powershell
+cd C:\Users\lmhk2\PycharmProjects\Stock_GPT_Analysis_Server1
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe create -y -n stock_server_py311 python=3.11
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python -m pip install -r requirements.txt
+```
+
+Create local secrets:
 
 ```powershell
 Copy-Item .env.local.example .env.local
 notepad .env.local
 ```
 
-키 설정 후 실제 GPT 연결 테스트:
+Required for full local operation:
 
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\openai_smoke_test.py
-```
+- `ADMIN_API_TOKEN`: admin dashboard token.
+- `OPENAI_API_KEY`: OpenAI API key for real GPT calls.
+- `CREDENTIAL_MASTER_KEY`: required before saving broker credentials.
+- `ENABLE_ORDER_API`: keep `0` unless a broker order adapter has been reviewed.
+- `ORDER_CONFIRMATION_TEXT`: exact phrase required when order confirmation is enabled.
 
-## 실행
+`.env.local` is ignored by git.
 
-권장 서버 환경:
+## Run
 
-```powershell
-cd C:\Users\lmhk2\PycharmProjects\Stock_GPT_Analysis_Server1
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe create -y -n stock_server_py311 python=3.11
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python -m pip install -r requirements.txt
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\runtime_check.py
-```
-
-Windows `py` launcher가 설치되어 있으면 `py -3.11 -m venv .venv`를 써도 된다.
-
-오프라인 안정화 체크:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\stability_check.py
-```
-
-운영 준비 상태 전체 점검:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
-```
-
-실제 OpenAI 호출까지 포함한 운영 점검:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py --live-openai
-```
-
-FastAPI 인증 smoke test:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\fastapi_smoke_test.py
-```
-
-관리자 대시보드 smoke test:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\admin_ui_smoke_test.py
-```
-
-사용자 클라이언트 smoke test:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\client_ui_smoke_test.py
-```
-
-환경변수 점검:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\env_check.py
-```
-
-DB migration 상태 점검:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\migration_check.py
-```
-
-SQLite DB 백업:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\backup_db.py
-```
-
-현재 환경에서 바로 실행 가능한 개발용 HTTP 서버:
-
-```powershell
-.\scripts\run_simple_server.ps1
-```
-
-개발용 서버 smoke test:
-
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\server_smoke_test.py
-```
-
-FastAPI 정식 API 서버:
+FastAPI server:
 
 ```powershell
 .\scripts\run_fastapi_server.ps1
 ```
 
-관리자 화면:
+Admin UI:
 
 ```text
 http://127.0.0.1:8000/admin/ui
 ```
 
-화면에서 `.env.local`의 `ADMIN_API_TOKEN`을 입력하면 사용자 목록, 요청 로그, GPT 호출 로그, 주문 요청, 사용자별 상세 정보를 조회할 수 있다. 테스트 사용자 생성, 사용자 접속 토큰 발급, 개별/전체 세션 폐기, 사용자 비활성화/재활성화도 이 화면에서 처리할 수 있다. 관리자 토큰은 브라우저 `sessionStorage`에만 저장되며, 발급된 사용자 토큰은 한 번만 표시된다.
-
-사용자 테스트 화면:
+Client UI:
 
 ```text
 http://127.0.0.1:8000/client/ui
 ```
 
-관리자 화면에서 발급한 `user_id`와 사용자 토큰을 입력하면 GPT 대화, 관심종목, 개인 메모리, 증권사 API provider 선택 및 credential 암호화 저장, 리포트 조회를 테스트할 수 있다. 사용자 토큰도 브라우저 `sessionStorage`에만 저장된다. 증권사 API key/secret/account 원문은 저장 요청에만 사용되고, 조회 화면에는 메타데이터만 표시된다.
-
-키움 OpenAPI+ legacy worker는 서버 본체와 분리해서 실행한다.
+Development fallback server:
 
 ```powershell
-.\scripts\run_kiwoom_legacy_worker.ps1
+.\scripts\run_simple_server.ps1
 ```
 
-키움 worker는 `py37_32`에서 QAxWidget 로그인을 수행하고 실시간 체결을 `data\kiwoom_spool\kiwoom_ticks.jsonl`에 기록한다. 서버 DB import는 Python 3.11 환경에서 별도로 실행한다.
+## Validation
+
+Core offline readiness:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
+```
+
+Include a real OpenAI API call:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py --live-openai
+```
+
+Focused checks:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\runtime_check.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\migration_check.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\fastapi_smoke_test.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\admin_ui_smoke_test.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\client_ui_smoke_test.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\kiwoom_spool_smoke_test.py
+```
+
+Kiwoom imported tick status:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\kiwoom_spool_status.py
+```
+
+## Kiwoom Legacy Runtime
+
+Kiwoom OpenAPI+ is not loaded by the main server. It stays in a separate 32-bit runtime:
 
 ```powershell
 .\scripts\run_kiwoom_legacy_worker.ps1 --codes 005930,000660 --seconds 60
 .\scripts\import_kiwoom_spool.ps1
 ```
 
-오프라인 spool/import 검증:
+The worker writes `kiwoom_tick_v1` events to `data\kiwoom_spool\kiwoom_ticks.jsonl`. The importer is idempotent by `source_event_id`, so repeated imports do not duplicate rows.
 
-```powershell
-C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\kiwoom_spool_smoke_test.py
-```
+Personal-version lessons applied here:
 
-현재 `py37_32` 환경은 서버 본체가 아니라 키움 legacy worker 실행용으로만 사용한다. 실제 정규장 실시간 tick 수집 검증은 장중에 수행해야 한다.
+- Keep Kiwoom login/QAxWidget work in one isolated process.
+- Verify minimal tick collection before wiring larger analysis workflows.
+- Treat after-hours login success separately from regular-session tick growth.
+- Use GPT to explain risk/reward and missing evidence, while deterministic code handles collection, indicators, storage, and safety gates.
 
-## 복사/제외 원칙
+See [docs/KIWOOM_LEGACY_INTEGRATION.md](docs/KIWOOM_LEGACY_INTEGRATION.md) for the detailed runbook.
 
-재사용한 파일은 분석 로직 중심으로 제한했다. `.env`, `ticks.db`, `__pycache__`, `.idea`, 캡처 PNG, 임시 DB는 새 프로젝트에 복사하지 않았다.
+## Security and Safety Notes
+
+- This is designed for private testing with a small trusted group.
+- Broker API secrets are never returned in plaintext after save.
+- User tokens are issued once and stored client-side only in `sessionStorage`.
+- Live order execution is intentionally disabled unless explicitly enabled and wired to a reviewed adapter.
+- If exposed outside the LAN, the preferred plan is Cloudflare Tunnel plus Cloudflare Access, not raw router port forwarding.
+
+## Current Limitations
+
+- Korea Investment REST adapter is scaffolded, but final behavior depends on the selected account/API environment.
+- Kiwoom live tick collection must be validated during a regular Korean market session on the server PC.
+- Cloudflare Tunnel and Windows service/autostart setup are not finalized in this checkout.
+- SQLite is appropriate for this private MVP; PostgreSQL would be the next step for heavier concurrent usage.
+- This system provides analysis support only. It does not guarantee returns and should not be treated as investment advice.
+
+## Roadmap
+
+1. Complete dedicated server PC setup and clone this repository.
+2. Recreate `stock_server_py311` and `py37_32` environments.
+3. Run offline `tools/ops_check.py` and UI smoke tests.
+4. Install and verify Kiwoom OpenAPI+ in the 32-bit worker environment.
+5. Run regular-session Kiwoom worker and confirm imported tick growth.
+6. Configure Cloudflare Tunnel and Access for private external access.
+7. Add deeper provider-specific market data paths after the final broker choice.
+8. Expand analysis quality reporting with paper-trade feedback and GPT-call cost dashboards.
