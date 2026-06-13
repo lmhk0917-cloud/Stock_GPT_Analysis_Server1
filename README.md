@@ -144,6 +144,7 @@ Focused checks:
 
 ```powershell
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\runtime_check.py
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\server_pc_preflight.py
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\migration_check.py
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\fastapi_smoke_test.py
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\admin_ui_smoke_test.py
@@ -162,11 +163,18 @@ C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_serv
 Kiwoom OpenAPI+ is not loaded by the main server. It stays in a separate 32-bit runtime:
 
 ```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n py37_32 python tools\kiwoom_runtime_check.py
 .\scripts\run_kiwoom_legacy_worker.ps1 --codes 005930,000660 --seconds 60
 .\scripts\import_kiwoom_spool.ps1
 ```
 
 The worker writes `kiwoom_tick_v1` events to `data\kiwoom_spool\kiwoom_ticks.jsonl`. The importer is idempotent by `source_event_id`, so repeated imports do not duplicate rows.
+
+For a one-command server-PC probe:
+
+```powershell
+.\scripts\run_kiwoom_live_probe.ps1 -Codes "005930,000660" -Seconds 60 -RequireTicks
+```
 
 Personal-version lessons applied here:
 
@@ -175,7 +183,7 @@ Personal-version lessons applied here:
 - Treat after-hours login success separately from regular-session tick growth.
 - Use GPT to explain risk/reward and missing evidence, while deterministic code handles collection, indicators, storage, and safety gates.
 
-See [docs/KIWOOM_LEGACY_INTEGRATION.md](docs/KIWOOM_LEGACY_INTEGRATION.md) for the detailed runbook.
+See [docs/KIWOOM_LEGACY_INTEGRATION.md](docs/KIWOOM_LEGACY_INTEGRATION.md) and [docs/SERVER_PC_SETUP.md](docs/SERVER_PC_SETUP.md) for the detailed runbooks.
 
 ## Security and Safety Notes
 

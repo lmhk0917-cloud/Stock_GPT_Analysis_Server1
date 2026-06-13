@@ -87,11 +87,18 @@ Then run the broader server check:
 C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\ops_check.py
 ```
 
+On a new server PC, run the dedicated preflight too:
+
+```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n stock_server_py311 python tools\server_pc_preflight.py
+```
+
 ## Live Worker Procedure
 
 Use this only on the Windows machine where Kiwoom OpenAPI+ is installed and the `py37_32` environment is configured.
 
 ```powershell
+C:\Users\lmhk2\anaconda3\Scripts\conda.exe run --no-capture-output -n py37_32 python tools\kiwoom_runtime_check.py
 .\scripts\run_kiwoom_legacy_worker.ps1 --codes 005930,000660 --seconds 60
 ```
 
@@ -118,6 +125,12 @@ KIWOOM_LEGACY_TICK_COUNT increases after import
 
 If login succeeds after hours but `KIWOOM_WORKER_SAVED_TICK_COUNT=0`, treat it as an incomplete market-data proof, not as a server failure.
 
+For a one-command probe that checks the Kiwoom runtime, runs the worker, imports the spool, and prints imported tick status:
+
+```powershell
+.\scripts\run_kiwoom_live_probe.ps1 -Codes "005930,000660" -Seconds 60 -RequireTicks
+```
+
 ## Server PC Stage
 
 The next meaningful live milestone is a dedicated server PC because Kiwoom's GUI login, security modules, Windows session state, and market-hours tests are environment-sensitive.
@@ -128,10 +141,11 @@ Recommended order:
 2. Recreate `stock_server_py311`.
 3. Recreate or install `py37_32` with Kiwoom dependencies.
 4. Run `tools\ops_check.py`.
-5. Install Kiwoom OpenAPI+ and verify OCX creation.
-6. Run the legacy worker during a regular market session.
-7. Import the spool and confirm tick growth through `tools\kiwoom_spool_status.py`.
-8. Only after local live proof, add Cloudflare Tunnel and Access.
+5. Run `tools\server_pc_preflight.py`.
+6. Install Kiwoom OpenAPI+ and verify OCX creation with `tools\kiwoom_runtime_check.py`.
+7. Run `scripts\run_kiwoom_live_probe.ps1` during a regular market session.
+8. Confirm tick growth through `tools\kiwoom_spool_status.py`.
+9. Only after local live proof, add Cloudflare Tunnel and Access.
 
 ## Risk Boundaries
 
