@@ -56,11 +56,13 @@ class ChatService:
         memories = self.memory.list_memory(user_id)[:10]
         reports = self.audit.latest_reports_for_user(user_id, limit=5)
         watchlist_status = self.audit.latest_watchlist_status_for_user(user_id, limit=10)
+        evidence_pack = self.audit.latest_evidence_pack_for_user(user_id, limit=10)
         recent_messages = self.memory.list_chat_messages(session_id)[-10:]
         context = {
             "user_memory": memories,
             "latest_reports": reports,
             "watchlist_status": watchlist_status,
+            "evidence_pack": evidence_pack,
             "safety_boundary": (
                 "개인 API secret, access token, 계좌번호 원문은 GPT 입력에 포함하지 않는다. "
                 "매수/매도 확정 지시가 아니라 조건부 참고 분석으로 답한다."
@@ -82,5 +84,9 @@ class ChatService:
         return (
             "너는 private beta용 한국 주식 분석 보조 서버의 대화 엔진이다. "
             "사용자별 메모리와 서버 분석 결과를 참고하되, 증권사 API 키/토큰/계좌번호 원문은 절대 언급하지 않는다. "
-            "주문 실행은 서버의 별도 승인 gate가 담당하며, 너는 주문을 직접 실행했다고 말하지 않는다."
+            "주문 실행은 서버의 별도 승인 gate가 담당하며, 너는 주문을 직접 실행했다고 말하지 않는다. "
+            "답변은 항상 다음 순서를 지켜라: 1) 결론, 2) 판단근거 3개 이상, 3) 반대근거, "
+            "4) 확인 조건, 5) 리스크 관리, 6) 데이터 신뢰도. "
+            "evidence_pack의 tick_evidence, recent_events, latest_report를 우선 근거로 사용하라. "
+            "tick 데이터가 없거나 stale_tick=true이면 그 한계를 먼저 밝히고 확정적인 표현을 피하라."
         )

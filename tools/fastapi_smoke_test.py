@@ -2,6 +2,8 @@
 
 import os
 import sys
+import uuid
+from datetime import datetime, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -12,7 +14,7 @@ os.environ["OPENAI_API_KEY"] = ""
 
 from app.config import ADMIN_API_TOKEN
 from fastapi.testclient import TestClient
-from server.api import app
+from server.api import app, conn
 
 
 def main():
@@ -41,6 +43,10 @@ def main():
         headers={"X-User-Token": token},
         json={"market": "KRX", "code": "005930", "name": "삼성전자", "use_gpt": False},
     )
+    seed_tick_evidence("005930")
+    evidence = client.get("/users/{}/evidence".format(user.json().get("id")), headers={"X-User-Token": token})
+    evidence_json = evidence.json() if evidence.status_code == 200 else {}
+    profile = client.get("/users/{}/profile".format(user.json().get("id")), headers={"X-User-Token": token})
     overview = client.get("/admin/overview", headers=admin_headers)
 
     checks = {
@@ -53,6 +59,11 @@ def main():
         and any(row["code"] == "005930" for row in symbol_search.json()),
         "user_analysis": user_analysis.status_code == 200
         and len(user_analysis.json().get("results", [])) == 1,
+        "tick_evidence": evidence.status_code == 200
+        and evidence_json.get("symbols", [{}])[0].get("tick_evidence", {}).get("sample_size", 0) >= 3
+        and evidence_json.get("symbols", [{}])[0].get("tick_evidence", {}).get("sample_vwap") is not None,
+        "profile_evidence": profile.status_code == 200
+        and "evidence_pack" in profile.json(),
         "overview": overview.status_code == 200 and overview.json()["status"] == "ok",
     }
     for name, ok in checks.items():
@@ -60,6 +71,42 @@ def main():
     if not all(checks.values()):
         raise SystemExit(1)
     print("FASTAPI_SMOKE_TEST_OK")
+
+
+def seed_tick_evidence(code):
+    now = datetime.now()
+    base_id = uuid.uuid4().hex
+    rows = [
+        (base_id + "-1", code, "145501", 70000, 100, 102.5, now - timedelta(seconds=20)),
+        (base_id + "-2", code, "145502", 70100, 120, 103.0, now - timedelta(seconds=10)),
+        (base_id + "-3", code, "145503", 70200, 130, 104.0, now),
+    ]
+    for source_event_id, tick_code, trade_time, price, volume, strength, received_at in rows:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO kiwoom_legacy_ticks(
+              source_event_id, market, code, trade_time, price, change_rate, acc_volume,
+              tick_volume, open_price, high_price, low_price, strength, received_at,
+              imported_at, raw_json
+            )
+            VALUES (?, 'KRX', ?, ?, ?, 0.1, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+            """,
+            (
+                source_event_id,
+                tick_code,
+                trade_time,
+                price,
+                volume,
+                volume,
+                price - 50,
+                price + 50,
+                price - 100,
+                strength,
+                received_at.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                now.strftime("%Y-%m-%d %H:%M:%S.%f"),
+            ),
+        )
+    conn.commit()
 
 
 if __name__ == "__main__":

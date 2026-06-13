@@ -95,6 +95,7 @@ def main():
         json={"content": "관심종목과 개인 메모리를 한 문장으로 요약해줘"},
     )
     profile = client.get("/users/{}/profile".format(user_id), headers=user_headers)
+    evidence = client.get("/users/{}/evidence".format(user_id), headers=user_headers)
     unauthorized = client.get("/users/{}/profile".format(user_id))
 
     profile_json = profile.json() if profile.status_code == 200 else {}
@@ -123,7 +124,10 @@ def main():
         and len(profile_json.get("watchlist", [])) >= 1
         and len(profile_json.get("memory", [])) >= 1
         and len(profile_json.get("broker_credentials", [])) >= 1
+        and "evidence_pack" in profile_json
         and "client-ui-smoke-app-secret" not in profile.text,
+        "evidence": evidence.status_code == 200
+        and evidence.json().get("schema") == "stock_gpt_evidence_pack_v1",
         "unauthorized": unauthorized.status_code == 401,
     }
 

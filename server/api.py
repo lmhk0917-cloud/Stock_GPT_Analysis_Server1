@@ -239,6 +239,7 @@ def create_api():
             "memory": memory.list_memory(user_id),
             "broker_credentials": _safe_credential_meta(user_id),
             "reports": audit.reports_for_user(user_id),
+            "evidence_pack": audit.latest_evidence_pack_for_user(user_id),
         }
 
     @app.post("/users/{user_id}/watchlist")
@@ -366,6 +367,11 @@ def create_api():
         _require_user_access(user_id, x_user_token, x_admin_token)
         return audit.reports_for_user(user_id)
 
+    @app.get("/users/{user_id}/evidence")
+    def get_user_evidence(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
+        return audit.latest_evidence_pack_for_user(user_id)
+
     @app.post("/users/{user_id}/analysis/run")
     def run_user_analysis(user_id: int, payload: UserAnalysisRunCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
         _require_user_access(user_id, x_user_token, x_admin_token)
@@ -382,6 +388,7 @@ def create_api():
             "symbols": symbols,
             "results": run_symbols(conn, symbols, use_gpt=payload.use_gpt),
             "watchlist_status": audit.latest_watchlist_status_for_user(user_id),
+            "evidence_pack": audit.latest_evidence_pack_for_user(user_id),
         }
 
     @app.get("/symbols/{market}/{code}/chart")
@@ -528,6 +535,7 @@ def create_api():
             "broker_credentials": _safe_credential_meta(user_id),
             "orders": OrderService(conn).list_orders(user_id),
             "reports": audit.reports_for_user(user_id),
+            "evidence_pack": audit.latest_evidence_pack_for_user(user_id),
         }
 
     return app
