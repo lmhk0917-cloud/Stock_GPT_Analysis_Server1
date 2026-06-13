@@ -13,8 +13,13 @@ from market_data.adapters.mock_adapter import MockMarketDataAdapter
 
 def run_once(conn, user_store, adapter=None, use_gpt=False):
     adapter = adapter or MockMarketDataAdapter()
-    audit_store = AuditStore(conn)
     symbols = user_store.unique_enabled_symbols() or adapter.list_symbols()
+    return run_symbols(conn, symbols, adapter=adapter, use_gpt=use_gpt)
+
+
+def run_symbols(conn, symbols, adapter=None, use_gpt=False):
+    adapter = adapter or MockMarketDataAdapter()
+    audit_store = AuditStore(conn)
     fetch_and_store_latest_bars(adapter, audit_store, symbols)
 
     analyzer = GPTAnalyzer() if use_gpt else None

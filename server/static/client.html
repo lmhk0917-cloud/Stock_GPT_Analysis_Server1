@@ -276,7 +276,12 @@
           Name
           <input id="watchName" type="text" autocomplete="off" placeholder="삼성전자">
         </label>
-        <button id="addWatch">추가/갱신</button>
+        <div class="row">
+          <button id="searchSymbol">검색</button>
+          <button id="addWatch">추가/갱신</button>
+          <button id="runAnalysis">즉시 분석</button>
+        </div>
+        <div id="symbolResults" class="stack"></div>
         <div class="status" id="watchStatus"></div>
       </div>
 
@@ -371,6 +376,7 @@
       view: "chat",
       profile: null,
       providers: [],
+      symbolResults: [],
       sessionId: null,
       messages: [],
     };
@@ -515,7 +521,15 @@
 
     function renderWatchlist() {
       const rows = state.profile ? state.profile.watchlist : [];
-      renderTable(rows, [
+      $("content").innerHTML = `
+        <div class="stack">
+          <div class="row">
+            <button id="runAllAnalysis">관심종목 전체 분석</button>
+          </div>
+          <div id="watchTable"></div>
+          <div class="status" id="watchViewStatus"></div>
+        </div>`;
+      renderTableInto("watchTable", rows, [
         {key: "id", label: "ID"},
         {key: "market", label: "Market"},
         {key: "code", label: "Code"},
@@ -523,6 +537,7 @@
         {key: "enabled", label: "Enabled"},
         {key: "updated_at", label: "Updated"},
       ]);
+      $("runAllAnalysis").addEventListener("click", () => runAnalysisForWatchlist());
     }
 
     function renderMemory() {
@@ -566,15 +581,19 @@
     }
 
     function renderTable(rows, columns) {
+      renderTableInto("content", rows, columns);
+    }
+
+    function renderTableInto(targetId, rows, columns) {
       if (!rows || rows.length === 0) {
-        $("content").innerHTML = `<div class="status">표시할 데이터가 없습니다.</div>`;
+        $(targetId).innerHTML = `<div class="status">표시할 데이터가 없습니다.</div>`;
         return;
       }
       const head = columns.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
       const body = rows.map((row) => `
         <tr>${columns.map((col) => `<td class="${col.wrap ? "wrap" : ""}">${cell(row, col)}</td>`).join("")}</tr>
       `).join("");
-      $("content").innerHTML = `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+      $(targetId).innerHTML = `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
     }
 
     function cell(row, col) {
@@ -596,6 +615,81 @@
           }),
         });
         status("watchStatus", "저장됨");
+        await refreshProfile();
+      } catch (error) {
+        status("watchStatus", error.message, true);
+      }
+    }
+
+    async function searchSymbol() {
+      try {
+        const q = $("watchName").value.trim() || $("watchCode").value.trim();
+        const market = $("watchMarket").value.trim() || "KRX";
+        state.symbolResults = await api(`/symbols/search?q=${encodeURIComponent(q)}&market=${encodeURIComponent(market)}&limit=8`);
+        renderSymbolResults();
+        status("watchStatus", `${state.symbolResults.length}개 검색됨`);
+      } catch (error) {
+        status("watchStatus", error.message, true);
+      }
+    }
+
+    function renderSymbolResults() {
+      const el = $("symbolResults");
+      if (!state.symbolResults || state.symbolResults.length === 0) {
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML = state.symbolResults.map((symbol, idx) => `
+        <button class="ghost" data-symbol-index="${idx}">
+          ${escapeHtml(symbol.name)} ${escapeHtml(symbol.code)}
+        </button>
+      `).join("");
+      el.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => {
+          const symbol = state.symbolResults[Number(button.dataset.symbolIndex)];
+          $("watchMarket").value = symbol.market;
+          $("watchCode").value = symbol.code;
+          $("watchName").value = symbol.name;
+          status("watchStatus", `${symbol.name} 선택됨`);
+        });
+      });
+    }
+
+    async function runAnalysisForWatchlist() {
+      try {
+        requireAccess();
+        status("watchViewStatus", "분석 실행 중...");
+        const result = await api(`/users/${state.userId}/analysis/run`, {
+          method: "POST",
+          body: JSON.stringify({use_gpt: false}),
+        });
+        status("watchViewStatus", `${result.results.length}개 분석 완료`);
+        await refreshProfile();
+      } catch (error) {
+        status("watchViewStatus", error.message, true);
+      }
+    }
+
+    async function runAnalysisForSelected() {
+      try {
+        requireAccess();
+        const code = $("watchCode").value.trim();
+        if (!code) {
+          status("watchStatus", "분석할 종목 코드를 입력하거나 검색 결과를 선택하세요.", true);
+          return;
+        }
+        status("watchStatus", "분석 실행 중...");
+        const result = await api(`/users/${state.userId}/analysis/run`, {
+          method: "POST",
+          body: JSON.stringify({
+            market: $("watchMarket").value.trim() || "KRX",
+            code,
+            name: $("watchName").value.trim() || code,
+            use_gpt: false,
+            add_to_watchlist: true,
+          }),
+        });
+        status("watchStatus", `${result.results.length}개 분석 완료`);
         await refreshProfile();
       } catch (error) {
         status("watchStatus", error.message, true);
@@ -699,6 +793,8 @@
 
     $("refreshProfile").addEventListener("click", refreshProfile);
     $("addWatch").addEventListener("click", addWatch);
+    $("searchSymbol").addEventListener("click", searchSymbol);
+    $("runAnalysis").addEventListener("click", runAnalysisForSelected);
     $("addMemory").addEventListener("click", addMemory);
     $("saveBroker").addEventListener("click", saveBrokerCredential);
     $("brokerProvider").addEventListener("change", updateBrokerEnvironmentOptions);

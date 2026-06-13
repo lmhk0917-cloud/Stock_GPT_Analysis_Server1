@@ -42,6 +42,12 @@ def main():
         headers=user_headers,
         json={"market": "KRX", "code": "005930", "name": "Samsung Electronics"},
     )
+    search = client.get("/symbols/search", params={"q": "하이닉스", "market": "KRX"})
+    run_analysis = client.post(
+        "/users/{}/analysis/run".format(user_id),
+        headers=user_headers,
+        json={"market": "KRX", "code": "000660", "name": "SK하이닉스", "use_gpt": False},
+    )
     memory = client.post(
         "/users/{}/memory".format(user_id),
         headers=user_headers,
@@ -100,6 +106,10 @@ def main():
         "issue_user_token": issued.status_code == 200 and bool(token),
         "profile_empty": profile_empty.status_code == 200,
         "watchlist": watch.status_code == 200 and len(watch.json()) >= 1,
+        "symbol_search": search.status_code == 200
+        and any(row["code"] == "000660" for row in search.json()),
+        "user_analysis": run_analysis.status_code == 200
+        and len(run_analysis.json().get("results", [])) == 1,
         "memory": memory.status_code == 200 and len(memory.json()) >= 1,
         "broker_credentials": credential.status_code == 200
         and len(credential.json()) >= 1

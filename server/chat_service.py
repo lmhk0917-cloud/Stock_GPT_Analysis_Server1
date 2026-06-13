@@ -55,10 +55,12 @@ class ChatService:
     def _build_messages(self, user_id, session_id):
         memories = self.memory.list_memory(user_id)[:10]
         reports = self.audit.latest_reports_for_user(user_id, limit=5)
+        watchlist_status = self.audit.latest_watchlist_status_for_user(user_id, limit=10)
         recent_messages = self.memory.list_chat_messages(session_id)[-10:]
         context = {
             "user_memory": memories,
             "latest_reports": reports,
+            "watchlist_status": watchlist_status,
             "safety_boundary": (
                 "개인 API secret, access token, 계좌번호 원문은 GPT 입력에 포함하지 않는다. "
                 "매수/매도 확정 지시가 아니라 조건부 참고 분석으로 답한다."

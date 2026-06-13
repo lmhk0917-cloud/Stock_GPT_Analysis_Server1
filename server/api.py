@@ -14,7 +14,8 @@ from core.credential_store import BrokerCredentialStore
 from core.memory_store import UserMemoryStore
 from core.request_audit_store import RequestAuditStore
 from core.session_store import SessionStore
-from market_data.realtime_worker import run_once
+from market_data.realtime_worker import run_once, run_symbols
+from market_data.symbol_catalog import resolve_symbol, search_symbols
 
 
 conn = init_db()
@@ -65,6 +66,9 @@ if BaseModel is object:
         pass
 
     class ChatAskCreate(object):
+        pass
+
+    class UserAnalysisRunCreate(object):
         pass
 
     class AdminSessionCreate(object):
@@ -130,6 +134,13 @@ else:
         session_id: int = None
         title: str = None
 
+    class UserAnalysisRunCreate(BaseModel):
+        market: str = "KRX"
+        code: str = None
+        name: str = None
+        use_gpt: bool = False
+        add_to_watchlist: bool = True
+
     class AdminSessionCreate(BaseModel):
         label: str = "admin-issued"
         expires_at: str = None
@@ -191,6 +202,11 @@ def create_api():
     @app.get("/broker-providers")
     def broker_providers():
         return list_broker_providers()
+
+    @app.get("/symbols/search")
+    def symbol_search(q: str = "", market: str = "KRX", limit: int = 20):
+        limit = max(1, min(int(limit or 20), 50))
+        return search_symbols(conn, query=q, market=market, limit=limit)
 
     @app.get("/users")
     def list_users(x_admin_token: str = Header(None)):
@@ -349,6 +365,24 @@ def create_api():
     def list_reports(user_id: int, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
         _require_user_access(user_id, x_user_token, x_admin_token)
         return audit.reports_for_user(user_id)
+
+    @app.post("/users/{user_id}/analysis/run")
+    def run_user_analysis(user_id: int, payload: UserAnalysisRunCreate, x_user_token: str = Header(None), x_admin_token: str = Header(None)):
+        _require_user_access(user_id, x_user_token, x_admin_token)
+        if payload.code:
+            symbol = resolve_symbol(conn, payload.market, payload.code, name=payload.name)
+            if payload.add_to_watchlist:
+                users.add_watchlist(user_id, symbol["code"], symbol["name"], symbol["market"], enabled=True)
+            symbols = [symbol]
+        else:
+            symbols = users.list_watchlist(user_id, enabled_only=True)
+            if not symbols:
+                raise HTTPException(status_code=400, detail="enabled watchlist is empty")
+        return {
+            "symbols": symbols,
+            "results": run_symbols(conn, symbols, use_gpt=payload.use_gpt),
+            "watchlist_status": audit.latest_watchlist_status_for_user(user_id),
+        }
 
     @app.get("/symbols/{market}/{code}/chart")
     def get_chart(market: str, code: str):

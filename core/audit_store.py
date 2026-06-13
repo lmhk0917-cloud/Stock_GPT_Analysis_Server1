@@ -150,6 +150,50 @@ class AuditStore:
             reports.append(data)
         return reports
 
+    def latest_watchlist_status_for_user(self, user_id, limit=20):
+        watch_rows = self.conn.execute(
+            """
+            SELECT market, code, name
+            FROM user_watchlists
+            WHERE user_id = ? AND enabled = 1
+            ORDER BY sort_order, id
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+        statuses = []
+        for watch in watch_rows:
+            report = self.conn.execute(
+                """
+                SELECT *
+                FROM analysis_results
+                WHERE market = ? AND code = ?
+                ORDER BY analyzed_at DESC, id DESC
+                LIMIT 1
+                """,
+                (watch["market"], watch["code"]),
+            ).fetchone()
+            price = self.conn.execute(
+                """
+                SELECT timestamp, close, volume, provider
+                FROM market_prices
+                WHERE market = ? AND code = ?
+                ORDER BY timestamp DESC, id DESC
+                LIMIT 1
+                """,
+                (watch["market"], watch["code"]),
+            ).fetchone()
+            item = row_to_dict(watch)
+            if report:
+                report_data = row_to_dict(report)
+                report_data["summary"] = loads_json(report_data.pop("summary_json"), {})
+                item["latest_report"] = report_data
+            else:
+                item["latest_report"] = None
+            item["latest_price"] = row_to_dict(price)
+            statuses.append(item)
+        return statuses
+
     def usage_summary(self, user_id=None):
         params = []
         user_filter = ""

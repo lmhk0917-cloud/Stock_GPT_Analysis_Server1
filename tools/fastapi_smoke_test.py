@@ -35,6 +35,12 @@ def main():
         headers={"X-User-Token": token},
         json={"content": "FastAPI 인증 smoke test"},
     )
+    symbol_search = client.get("/symbols/search", params={"q": "삼성", "market": "KRX"})
+    user_analysis = client.post(
+        "/users/{}/analysis/run".format(user.json().get("id")),
+        headers={"X-User-Token": token},
+        json={"market": "KRX", "code": "005930", "name": "삼성전자", "use_gpt": False},
+    )
     overview = client.get("/admin/overview", headers=admin_headers)
 
     checks = {
@@ -43,6 +49,10 @@ def main():
         "login": login.status_code == 200 and bool(token),
         "unauthorized_user_chat": unauthorized.status_code == 401,
         "authorized_user_chat": chat.status_code == 200 and bool(chat.json().get("answer")),
+        "symbol_search": symbol_search.status_code == 200
+        and any(row["code"] == "005930" for row in symbol_search.json()),
+        "user_analysis": user_analysis.status_code == 200
+        and len(user_analysis.json().get("results", [])) == 1,
         "overview": overview.status_code == 200 and overview.json()["status"] == "ok",
     }
     for name, ok in checks.items():
