@@ -49,6 +49,21 @@ flowchart LR
 - Kiwoom legacy boundary: 32-bit worker writes realtime tick events to JSONL, Python 3.11 importer stores them in SQLite.
 - Operational checks: one-command `tools/ops_check.py` runs the core offline readiness suite.
 
+## Current Implementation Status
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Multi-user auth/session | Implemented | Admin issues user tokens; inactive users lose sessions. |
+| Per-user watchlist/search | Implemented | Local catalog plus DB-backed symbol search; CSV import tool exists. |
+| Per-user memory/chat | Implemented | GPT context includes private memory and watchlist evidence. |
+| GPT advice evidence | Implemented offline | Evidence pack includes tick summary, VWAP distance, events, report, FX slot, and paper-trade status. |
+| Kiwoom live tick path | Prepared | Worker/spool/import/status/probe code exists; server-PC regular-session proof still required. |
+| Paper-trade feedback | Partially prepared | Evidence pack can include `paper_trade_results` if the table is later added/imported. |
+| FX context | Prepared | `.env.local` fallback exists; broker/official FX provider still needs final source selection. |
+| GPT cost dashboard | Basic | Admin overview shows call count, token totals, and configurable cost estimate. |
+| External access | Planned | Prefer Cloudflare Tunnel + Access after local server-PC proof. |
+| Order API | Scaffolded disabled | `ENABLE_ORDER_API=0` remains the safe default. |
+
 ## Tech Stack
 
 - Python 3.11, FastAPI, Uvicorn
@@ -198,6 +213,8 @@ See [docs/KIWOOM_LEGACY_INTEGRATION.md](docs/KIWOOM_LEGACY_INTEGRATION.md) and [
 - Korea Investment REST adapter is scaffolded, but final behavior depends on the selected account/API environment.
 - Kiwoom live tick collection must be validated during a regular Korean market session on the server PC.
 - Cloudflare Tunnel and Windows service/autostart setup are not finalized in this checkout.
+- FX is currently manual/env based unless a broker or official provider is configured.
+- Paper-trade feedback is represented in the evidence contract but needs a server-side evaluation table/source.
 - SQLite is appropriate for this private MVP; PostgreSQL would be the next step for heavier concurrent usage.
 - This system provides analysis support only. It does not guarantee returns and should not be treated as investment advice.
 

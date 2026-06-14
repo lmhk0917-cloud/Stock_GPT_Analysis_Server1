@@ -1,8 +1,10 @@
 """Persistence for shared analysis and delivery audit records."""
 
+import os
 from datetime import datetime
 
 from core.database import dumps_json, loads_json, row_to_dict, utc_now
+from market_data.fx_provider import get_fx_snapshot
 
 
 class AuditStore:
@@ -214,6 +216,7 @@ class AuditStore:
             report = self._latest_report(symbol["market"], symbol["code"])
             latest_price = self._latest_price(symbol["market"], symbol["code"])
             recent_events = self._recent_events(symbol["market"], symbol["code"], limit=5)
+            paper_trade_feedback = self._paper_trade_feedback(symbol["code"])
             missing_data = []
             if not tick_evidence:
                 missing_data.append("kiwoom_legacy_ticks")
@@ -241,12 +244,14 @@ class AuditStore:
                 "latest_price": latest_price,
                 "latest_report": report,
                 "recent_events": recent_events,
+                "paper_trade_feedback": paper_trade_feedback,
                 "data_quality": data_quality,
             })
         return {
             "schema": "stock_gpt_evidence_pack_v1",
             "generated_at": utc_now(),
             "user_id": user_id,
+            "fx_context": get_fx_snapshot(),
             "symbols": symbols,
             "guidance": (
                 "Use this as evidence, not as an order instruction. If tick data is missing "
@@ -274,9 +279,23 @@ class AuditStore:
             params,
         ).fetchone()[0]
 
-        gpt_tokens = self.conn.execute(
-            "SELECT COALESCE(SUM(total_tokens), 0) FROM gpt_call_logs"
-        ).fetchone()[0]
+        gpt_row = self.conn.execute(
+            """
+            SELECT COUNT(*) AS call_count,
+                   COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                   COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+                   COALESCE(SUM(total_tokens), 0) AS total_tokens
+            FROM gpt_call_logs
+            """
+        ).fetchone()
+        gpt_tokens = gpt_row["total_tokens"]
+        input_price = _to_float(os.getenv("OPENAI_EST_INPUT_USD_PER_1M_TOKENS")) or 0.15
+        output_price = _to_float(os.getenv("OPENAI_EST_OUTPUT_USD_PER_1M_TOKENS")) or 0.60
+        estimated_gpt_cost_usd = round(
+            (gpt_row["prompt_tokens"] / 1000000.0 * input_price)
+            + (gpt_row["completion_tokens"] / 1000000.0 * output_price),
+            6,
+        )
 
         users = self.conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         watchlists = self.conn.execute("SELECT COUNT(*) FROM user_watchlists").fetchone()[0]
@@ -292,6 +311,14 @@ class AuditStore:
             "notifications": notification_count,
             "orders": order_count,
             "gpt_total_tokens_all_users": gpt_tokens,
+            "gpt_call_count_all_users": gpt_row["call_count"],
+            "gpt_prompt_tokens_all_users": gpt_row["prompt_tokens"],
+            "gpt_completion_tokens_all_users": gpt_row["completion_tokens"],
+            "estimated_gpt_cost_usd": estimated_gpt_cost_usd,
+            "estimated_gpt_cost_note": (
+                "Uses OPENAI_EST_INPUT_USD_PER_1M_TOKENS and "
+                "OPENAI_EST_OUTPUT_USD_PER_1M_TOKENS defaults; verify current pricing before billing reports."
+            ),
         }
 
     def _tick_evidence(self, market, code, tick_limit=300):
@@ -326,6 +353,7 @@ class AuditStore:
         latest_dt = _parse_datetime(latest.get("received_at"))
         age_sec = int((datetime.now() - latest_dt).total_seconds()) if latest_dt else None
 
+        minute_bars = _minute_bars(ticks)
         return {
             "source": "kiwoom_legacy_ticks",
             "sample_size": len(ticks),
@@ -339,10 +367,17 @@ class AuditStore:
             "latest_change_rate": _to_float(latest.get("change_rate")),
             "sample_tick_volume_sum": total_volume,
             "sample_vwap": vwap,
+            "latest_vwap_distance_pct": (
+                round((latest_price - vwap) / vwap * 100, 4)
+                if latest_price is not None and vwap not in (None, 0)
+                else None
+            ),
             "latest_strength": _to_float(latest.get("strength")),
             "avg_strength": round(sum(strengths) / len(strengths), 4) if strengths else None,
             "high_price_in_sample": _max_float(tick.get("price") for tick in ticks),
             "low_price_in_sample": _min_float(tick.get("price") for tick in ticks),
+            "minute_bars": minute_bars,
+            "latest_1m_volume_ratio": _latest_volume_ratio(minute_bars),
         }
 
     def _latest_report(self, market, code):
@@ -393,6 +428,46 @@ class AuditStore:
             events.append(data)
         return events
 
+    def _paper_trade_feedback(self, code):
+        exists = self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'paper_trade_results'"
+        ).fetchone()
+        if not exists:
+            return {"status": "unavailable", "reason": "paper_trade_results table not present"}
+        rows = self.conn.execute(
+            """
+            SELECT *
+            FROM paper_trade_results
+            WHERE code = ?
+            ORDER BY evaluated_at DESC
+            LIMIT 30
+            """,
+            (code,),
+        ).fetchall()
+        if not rows:
+            return {"status": "empty", "sample_size": 0}
+        returns = []
+        wins = 0
+        losses = 0
+        for row in rows:
+            data = row_to_dict(row)
+            ret = _to_float(data.get("return_30m_pct")) or _to_float(data.get("return_60m_pct"))
+            if ret is not None:
+                returns.append(ret)
+                if ret > 0:
+                    wins += 1
+                elif ret < 0:
+                    losses += 1
+        return {
+            "status": "available",
+            "sample_size": len(rows),
+            "measured_return_count": len(returns),
+            "avg_return_pct": round(sum(returns) / len(returns), 4) if returns else None,
+            "win_count": wins,
+            "loss_count": losses,
+            "win_rate_pct": round(wins / len(returns) * 100, 2) if returns else None,
+        }
+
 
 def _parse_datetime(value):
     if not value:
@@ -428,3 +503,40 @@ def _min_float(values):
     numbers = [_to_float(value) for value in values]
     numbers = [value for value in numbers if value is not None]
     return min(numbers) if numbers else None
+
+
+def _minute_bars(ticks, limit=5):
+    buckets = {}
+    for tick in ticks:
+        received_at = str(tick.get("received_at") or "")
+        minute = received_at[:16]
+        price = _to_float(tick.get("price"))
+        volume = _to_float(tick.get("tick_volume")) or 0
+        if not minute or price is None:
+            continue
+        bar = buckets.setdefault(minute, {
+            "minute": minute,
+            "open": price,
+            "high": price,
+            "low": price,
+            "close": price,
+            "tick_volume": 0,
+            "tick_count": 0,
+        })
+        bar["high"] = max(bar["high"], price)
+        bar["low"] = min(bar["low"], price)
+        bar["close"] = price
+        bar["tick_volume"] += volume
+        bar["tick_count"] += 1
+    return list(buckets.values())[-limit:]
+
+
+def _latest_volume_ratio(minute_bars):
+    if not minute_bars or len(minute_bars) < 2:
+        return None
+    latest = minute_bars[-1]["tick_volume"]
+    previous = [bar["tick_volume"] for bar in minute_bars[:-1] if bar["tick_volume"] is not None]
+    if not previous:
+        return None
+    average = sum(previous) / len(previous)
+    return round(latest / average, 4) if average else None

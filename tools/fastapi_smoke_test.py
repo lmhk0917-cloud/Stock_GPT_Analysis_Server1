@@ -61,10 +61,14 @@ def main():
         and len(user_analysis.json().get("results", [])) == 1,
         "tick_evidence": evidence.status_code == 200
         and evidence_json.get("symbols", [{}])[0].get("tick_evidence", {}).get("sample_size", 0) >= 3
-        and evidence_json.get("symbols", [{}])[0].get("tick_evidence", {}).get("sample_vwap") is not None,
+        and evidence_json.get("symbols", [{}])[0].get("tick_evidence", {}).get("sample_vwap") is not None
+        and "fx_context" in evidence_json
+        and "paper_trade_feedback" in evidence_json.get("symbols", [{}])[0],
         "profile_evidence": profile.status_code == 200
         and "evidence_pack" in profile.json(),
         "overview": overview.status_code == 200 and overview.json()["status"] == "ok",
+        "usage_cost_fields": overview.status_code == 200
+        and "estimated_gpt_cost_usd" in overview.json().get("usage", {}),
     }
     for name, ok in checks.items():
         print("{}={}".format(name, "OK" if ok else "FAIL"))

@@ -362,6 +362,7 @@
         <button data-view="watchlist">관심종목</button>
         <button data-view="memory">메모리</button>
         <button data-view="credentials">증권사 API</button>
+        <button data-view="evidence">판단근거</button>
         <button data-view="reports">리포트</button>
         <button data-view="profile">프로필</button>
       </div>
@@ -462,6 +463,7 @@
         watchlist: renderWatchlist,
         memory: renderMemory,
         credentials: renderCredentials,
+        evidence: renderEvidence,
         reports: renderReports,
         profile: renderProfile,
       };
@@ -561,6 +563,50 @@
         {key: "can_order", label: "Order"},
         {key: "is_active", label: "Active"},
         {key: "updated_at", label: "Updated"},
+      ]);
+    }
+
+    function renderEvidence() {
+      const pack = state.profile ? state.profile.evidence_pack : null;
+      const symbols = pack && pack.symbols ? pack.symbols : [];
+      if (!pack || symbols.length === 0) {
+        $("content").innerHTML = `<div class="status">판단근거 데이터가 없습니다.</div>`;
+        return;
+      }
+      const rows = symbols.map((symbol) => {
+        const tick = symbol.tick_evidence || {};
+        const quality = symbol.data_quality || {};
+        const paper = symbol.paper_trade_feedback || {};
+        return {
+          code: symbol.code,
+          name: symbol.name,
+          latest_price: tick.latest_price ?? "",
+          vwap_distance: tick.latest_vwap_distance_pct ?? "",
+          volume_ratio: tick.latest_1m_volume_ratio ?? "",
+          sample_size: tick.sample_size ?? 0,
+          latest_tick_age_sec: quality.latest_tick_age_sec ?? "",
+          stale: quality.stale_tick ?? "",
+          paper: paper.status || "",
+          missing: (quality.missing_data || []).join(", "),
+        };
+      });
+      $("content").innerHTML = `
+        <div class="stack">
+          <div class="status">FX: ${escapeHtml(JSON.stringify(pack.fx_context || {}))}</div>
+          <div id="evidenceTable"></div>
+          <pre>${escapeHtml(JSON.stringify(pack, null, 2))}</pre>
+        </div>`;
+      renderTableInto("evidenceTable", rows, [
+        {key: "code", label: "Code"},
+        {key: "name", label: "Name"},
+        {key: "latest_price", label: "Price"},
+        {key: "vwap_distance", label: "VWAP%"},
+        {key: "volume_ratio", label: "VolRatio"},
+        {key: "sample_size", label: "Ticks"},
+        {key: "latest_tick_age_sec", label: "AgeSec"},
+        {key: "stale", label: "Stale"},
+        {key: "paper", label: "Paper"},
+        {key: "missing", label: "Missing", wrap: true},
       ]);
     }
 

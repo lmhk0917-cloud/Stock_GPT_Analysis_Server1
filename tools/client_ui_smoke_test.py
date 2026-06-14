@@ -127,7 +127,8 @@ def main():
         and "evidence_pack" in profile_json
         and "client-ui-smoke-app-secret" not in profile.text,
         "evidence": evidence.status_code == 200
-        and evidence.json().get("schema") == "stock_gpt_evidence_pack_v1",
+        and evidence.json().get("schema") == "stock_gpt_evidence_pack_v1"
+        and "fx_context" in evidence.json(),
         "unauthorized": unauthorized.status_code == 401,
     }
 
